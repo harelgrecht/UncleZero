@@ -1,28 +1,48 @@
 #include <Arduino.h>
 #include "../include/utils.h"
 
-void setup() {
-    Serial.begin(115200);
-    delay(5000);
-    pinMode(SENSOR_PIN, INPUT_PULLUP);
-    pinMode(STATUS_LED, OUTPUT);
+volatile bool sensorIrq = false;
 
-    //wifiSetUp();
-
+void IRAM_ATTR irqChange() {
+    sensorIrq = true;
 }
 
-void loop() {
-    monitorWiFiConnection();
+void isrTankStatus() {
     int sensorState = digitalRead(SENSOR_PIN);
 
     if (sensorState == TANK_EMPTY) {
         digitalWrite(STATUS_LED, LOW);
-        Serial.println("Gas tank Empty - Low Pressure");
+        Serial.println("Tank Empty - Low Pressure");
     } 
-    else { // TANK_FULL
+    else { 
         digitalWrite(STATUS_LED, HIGH);
         Serial.println("Tank Full - Pressure OK");
     }
-    
-    delay(1000);
+}
+
+void onBootTankStatus() {
+    isrTankStatus();
+}
+
+void setup() {
+    Serial.begin(115200);
+    delay(3000);
+    pinMode(SENSOR_PIN, INPUT_PULLUP);
+    pinMode(STATUS_LED, OUTPUT);
+
+    wifiSetUp();
+
+    onBootTankStatus();
+
+    attachInterrupt(digitalPinToInterrupt(SENSOR_PIN), irqChange, CHANGE);
+}
+
+void loop() {
+    monitorWiFiConnection();
+
+    if (sensorIrq) {
+        delay(50); // Simple debounce
+        isrTankStatus(); // Handle the event
+        sensorIrq = false; // Reset flag
+    }
 }
