@@ -3,7 +3,7 @@
 
 void setup() {
     Serial.begin(115200);
-
+    delay(5000);
     pinMode(SENSOR_PIN, INPUT_PULLUP);
     pinMode(STATUS_LED, OUTPUT);
 

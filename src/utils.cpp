@@ -1,34 +1,44 @@
 #include "../include/utils.h"
 #include <WiFi.h>
 
-const char* ssid = "LironWifi";
-const char* password = "123456789";
+const char* ssid = "Harel’s iPhone";
+const char* password = "0123456789";
 
 void wifiScanNetworks() {
+ Serial.println("\n--- WiFi Diagnostic Scan ---");
+
+    WiFi.disconnect(true, true);
+    delay(100);
     WiFi.mode(WIFI_STA);
-    WiFi.disconnect();
+    WiFi.setSleep(false);
     delay(100);
 
-    Serial.println("Starting network scan...");
-    int wifiCount = WiFi.scanNetworks();
+    Serial.println("Scanning...");
+    int n = WiFi.scanNetworks();
     
-    if (wifiCount == 0) {
-        Serial.println("No networks found");
-    } else {
-        Serial.print(wifiCount);
+    if (n == 0) {
+        Serial.println("Result: 0 networks found.");
+    } 
+    else if (n < 0) {
+        Serial.print("Error Code: ");
+        Serial.println(n);
+    }
+    else {
+        Serial.print(n);
         Serial.println(" networks found:");
-        for (int i = 0; i < wifiCount; ++i) {
+        for (int i = 0; i < n; ++i) {
+            Serial.print("[");
             Serial.print(i + 1);
-            Serial.print(": ");
+            Serial.print("] ");
             Serial.print(WiFi.SSID(i));
-            Serial.print(" (");
+            Serial.print(" | ");
             Serial.print(WiFi.RSSI(i));
-            Serial.print(")");
-            Serial.println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
+            Serial.println(" dBm");
             delay(10);
         }
     }
-    Serial.println("Scan done");
+    WiFi.scanDelete();
+    Serial.println("----------------------------");
 }
 
 void wifiSetUp() {
