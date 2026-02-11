@@ -1,8 +1,8 @@
 #include "../include/utils.h"
 #include <WiFi.h>
 
-const char* ssid = "Harel’s iPhone";
-const char* password = "0123456789";
+const char* ssid = "Guy";
+const char* password = "0542229097";
 
 void wifiScanNetworks() {
  Serial.println("\n--- WiFi Diagnostic Scan ---");
