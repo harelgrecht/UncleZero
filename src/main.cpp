@@ -1,27 +1,38 @@
 #include <Arduino.h>
-
-
-#define LOW_GAS HIGH
-#define HIGH_GAS LOW
-#define statusLed 8
-#define sensorPin 10
-
+#include "../include/utils.h"
 
 void setup() {
-    pinMode(sensorPin, INPUT);
-    pinMode(sensorPin, INPUT_PULLUP);
-    pinMode(statusLed, OUTPUT);
     Serial.begin(115200);
+
+    pinMode(SENSOR_PIN, INPUT_PULLUP);
+    pinMode(STATUS_LED, OUTPUT);
+
+    //setupWiFi();
+    setupEmail();
 }
 
 void loop() {
-    if(digitalRead(sensorPin) == LOW) {
-        digitalWrite(statusLed, LOW);
-        Serial.println("No Gas (Closed) - LED ON");
-    } else {
-        digitalWrite(statusLed, HIGH);
-        Serial.println("Gas Detected (Open) - LED OFF");
-    }
-    delay(100);
-}
+    int sensorState = digitalRead(SENSOR_PIN);
 
+    if (sensorState == TANK_EMPTY) {
+        digitalWrite(STATUS_LED, TANK_EMPTY);
+        Serial.println("Tank Empty - Low Pressure");
+
+        if (!messageSent) {
+            Serial.println(">> Gas tank empty! Sending Email...");
+            sendEmail("WARNING: Gas tank empty Detected!", "Alert: Low pressure detected.");
+            messageSent = true;
+        }
+    } 
+    else { // TANK_FULL
+        digitalWrite(STATUS_LED, TANK_FULL);
+        Serial.println("Tank Full - Pressure OK");
+
+        if (messageSent) {
+            Serial.println(">> System returned to normal state.");
+            messageSent = false;
+        }
+    }
+    
+    delay(500);
+}
