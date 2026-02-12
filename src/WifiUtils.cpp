@@ -1,10 +1,13 @@
 #include "../include/WifiUtils.h"
 #include <WiFi.h>
 
-const char* ssid = "LironWifi";
-const char* password = "123456789";
+const char* ssid = "Harel’s iPhone";
+const char* password = "0123456789";
 
-void wifiScanNetworks() {
+const IPAddress primaryDNS(8, 8, 8, 8);
+const IPAddress secondaryDNS(8, 8, 4, 4);
+
+void wifiScanNetworks() {   
  Serial.println("\n--- WiFi Diagnostic Scan ---");
 
     WiFi.disconnect(true, true);
@@ -50,13 +53,21 @@ void wifiSetUp() {
 
     WiFi.mode(WIFI_STA);
     WiFi.setSleep(false);
-    WiFi.begin(ssid, password);
 
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
+    if (!WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, primaryDNS, secondaryDNS)) {
+        Serial.println("Failed to configure DNS!");
     }
 
+    WiFi.begin(ssid, password);
+
+    bool ledState = false;
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(250);
+        Serial.print(".");
+        ledState = !ledState;
+        digitalWrite(STATUS_LED, ledState ? LED_OFF : LED_ON);
+    }
+    digitalWrite(STATUS_LED, LED_OFF);
     Serial.println("");
     Serial.println("WiFi connected");
     Serial.print("IP address: ");
