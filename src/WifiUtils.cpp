@@ -1,8 +1,8 @@
 #include "../include/WifiUtils.h"
 #include <WiFi.h>
 
-const char* ssid = "Guy";
-const char* password = "0542229097";
+const char* ssid = "LironWifi";
+const char* password = "123456789";
 
 void wifiScanNetworks() {
  Serial.println("\n--- WiFi Diagnostic Scan ---");
@@ -64,12 +64,20 @@ void wifiSetUp() {
 }
 
 void monitorWiFiConnection() {
-    if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("Connection lost! Reconnecting...");
-        WiFi.disconnect();
-        WiFi.reconnect();
-    } else {
-        Serial.print("WiFi Stable | RSSI: ");
-        Serial.println(WiFi.RSSI());
+    static unsigned long lastCheckTime = 0;
+    const unsigned long interval = 10000;
+
+    if(millis() - lastCheckTime >= interval) {
+        lastCheckTime = millis();
+
+        if (WiFi.status() != WL_CONNECTED) {
+            Serial.println("Connection lost! Reconnecting...");
+            WiFi.disconnect();
+            WiFi.reconnect();
+        } else {
+            Serial.print("WiFi Stable | RSSI: ");
+            Serial.println(WiFi.RSSI());
+            
+        }
     }
 }
