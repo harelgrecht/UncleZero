@@ -1,5 +1,5 @@
-#ifndef GAS_UTILS_H
-#define GAS_UTILS_H
+#ifndef WIFI_UTILS_H
+#define WIFI_UTILS_H
 
 #include <Arduino.h>
 #include <WiFi.h>

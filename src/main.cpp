@@ -1,13 +1,13 @@
 #include <Arduino.h>
-#include "../include/utils.h"
+#include "../include/WifiUtils.h"
 
 volatile bool sensorIrq = false;
 
-void IRAM_ATTR irqChange() {
+void IRAM_ATTR isrChange() {
     sensorIrq = true;
 }
 
-void isrTankStatus() {
+void checkTankStatus() {
     int sensorState = digitalRead(SENSOR_PIN);
 
     if (sensorState == TANK_EMPTY) {
@@ -21,7 +21,7 @@ void isrTankStatus() {
 }
 
 void onBootTankStatus() {
-    isrTankStatus();
+    checkTankStatus();
 }
 
 void setup() {
@@ -34,15 +34,15 @@ void setup() {
 
     onBootTankStatus();
 
-    attachInterrupt(digitalPinToInterrupt(SENSOR_PIN), irqChange, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(SENSOR_PIN), isrChange, CHANGE);
 }
 
 void loop() {
     monitorWiFiConnection();
 
     if (sensorIrq) {
-        delay(50); // Simple debounce
-        isrTankStatus(); // Handle the event
-        sensorIrq = false; // Reset flag
+        delay(50); 
+        checkTankStatus(); 
+        sensorIrq = false; 
     }
 }
