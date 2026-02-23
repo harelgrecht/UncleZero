@@ -1,8 +1,5 @@
 #include "../include/WifiUtils.h"
 
-const char* ssid = "Guy";
-const char* password = "0542229097";
-
 void wifiScanNetworks() {   
     Serial.println("\n--- WiFi Scan ---");
 
@@ -12,21 +9,16 @@ void wifiScanNetworks() {
     WiFi.setSleep(false);
     delay(100);
 
-    int n = WiFi.scanNetworks();
+    int networkCount = WiFi.scanNetworks();
     
-    if (n == 0) {
+    if (networkCount == 0) {
         Serial.println("0 networks found.");
-    } else if (n > 0) {
-        Serial.print(n);
+    } else if (networkCount > 0) {
+        Serial.print(networkCount);
         Serial.println(" networks found:");
-        for (int i = 0; i < n; ++i) {
-            Serial.print("[");
-            Serial.print(i + 1);
-            Serial.print("] ");
-            Serial.print(WiFi.SSID(i));
-            Serial.print(" | ");
-            Serial.print(WiFi.RSSI(i));
-            Serial.println(" dBm");
+        Serial.printf("%d networks found:\n", networkCount);
+        for (int i = 0; i < networkCount; ++i) {
+            Serial.printf("[%d] %s | %d dBm\n", i + 1, WiFi.SSID(i).c_str(), WiFi.RSSI(i));
             delay(10);
         }
     }
@@ -37,29 +29,27 @@ void wifiScanNetworks() {
 void wifiSetUp() {
     wifiScanNetworks();
 
-    Serial.print("\nConnecting to ");
-    Serial.println(ssid);
+    Serial.printf("\nConnecting to %s\n", wifiSsid);
 
-    // Reset radio before connecting
     WiFi.disconnect(true, true);
     delay(1000); 
 
     WiFi.mode(WIFI_STA);
     WiFi.setTxPower(WIFI_POWER_8_5dBm); // Prevent brownout
-    WiFi.begin(ssid, password);
+    WiFi.begin(wifiSsid, wifiPassword);
 
-    int attempts = 0;
-    bool ledState = false;
+    int connectionAttempts = 0;
+    bool isLedActive = false;
     
-    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    while (WiFi.status() != WL_CONNECTED && connectionAttempts < 20) {
         delay(500);
         Serial.print(".");
-        ledState = !ledState;
-        digitalWrite(STATUS_LED, ledState ? HIGH : LOW);
-        attempts++;
+        isLedActive = !isLedActive;
+        digitalWrite(statusLedPin, isLedActive ? HIGH : LOW);
+        connectionAttempts++;
     }
 
-    digitalWrite(STATUS_LED, HIGH); // LED off
+    digitalWrite(statusLedPin, ledOff); 
 
     if (WiFi.status() == WL_CONNECTED) {
         WiFi.setTxPower(WIFI_POWER_19_5dBm); // Restore TX power
@@ -85,8 +75,7 @@ void monitorWiFiConnection() {
             WiFi.disconnect();
             WiFi.reconnect();
         } else {
-            Serial.print("WiFi Stable | RSSI: ");
-            Serial.println(WiFi.RSSI());
+            Serial.printf("WiFi Stable | RSSI: %d dBm\n", WiFi.RSSI());
         }
     }
 }

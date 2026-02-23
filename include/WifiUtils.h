@@ -1,15 +1,20 @@
-#ifndef WIFI_UTILS_H
-#define WIFI_UTILS_H
+#ifndef WIFIUTILS_H
+#define WIFIUTILS_H
+
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include "../include/env.h"
 
-#define STATUS_LED 8
-#define SENSOR_PIN 10
-#define LED_ON LOW
-#define LED_OFF HIGH
-#define TANK_FULL HIGH // circut open 
-#define TANK_EMPTY LOW // circut close 
+// Hardware Pins & States
+constexpr uint8_t statusLedPin = 8;
+constexpr uint8_t sensorPin = 10;
+
+constexpr uint8_t tankFullState = HIGH; // Circuit open 
+constexpr uint8_t tankEmptyState = LOW; // Circuit close 
+
+constexpr uint8_t ledOn = LOW;          // Active Low LED
+constexpr uint8_t ledOff = HIGH;
 
 void wifiScanNetworks();
 void wifiSetUp();

@@ -4,36 +4,36 @@
 
 
 
-volatile bool sensorIrq = false;
+volatile bool isSensorTriggered = false;
 
-void IRAM_ATTR isrChange() {
-    sensorIrq = true;
+void IRAM_ATTR handleSensorInterrupt() {
+    isSensorTriggered = true;
 }
 
 void checkTankStatus() {
-    int sensorState = digitalRead(SENSOR_PIN);
+    int sensorState = digitalRead(sensorPin);
 
-    if (sensorState == TANK_EMPTY) {
-        digitalWrite(STATUS_LED, LED_ON);
+    if (sensorState == tankEmptyState) {
+        digitalWrite(statusLedPin, ledOn);
         Serial.println("Tank Empty - Low Pressure");
         sendEmail("URGENT: Gas Tank Empty!", "The gas tank is empty. Please order a replacement.");
     } 
     else { 
-        digitalWrite(STATUS_LED, LED_OFF);
+        digitalWrite(statusLedPin, ledOff);
         Serial.println("Tank Full - Pressure OK");
     }
 }
 
-void onBootTankStatus() {    
-    int sensorState = digitalRead(SENSOR_PIN);
+void verifyInitialTankStatus() {    
+    int sensorState = digitalRead(sensorPin);
 
-    if (sensorState == TANK_EMPTY) {
-        digitalWrite(STATUS_LED, LED_ON);
+    if (sensorState == tankEmptyState) {
+        digitalWrite(statusLedPin, ledOn);
         Serial.println("Boot status: Tank Empty");
         sendEmail("Initial: First check on boot", "The gas tank is EMPTY. Please order a replacement.");
     } 
     else { 
-        digitalWrite(STATUS_LED, LED_OFF);
+        digitalWrite(statusLedPin, ledOff);
         Serial.println("Boot status: Tank Full");
         sendEmail("Initial: First check on boot", "The gas tank is FULL. Everything is OK.");
     }
@@ -43,25 +43,25 @@ void setup() {
     Serial.begin(115200);
     delay(3000);
 
-    pinMode(SENSOR_PIN, INPUT_PULLUP);
-    pinMode(STATUS_LED, OUTPUT);
-    digitalWrite(STATUS_LED, LED_OFF);
+    pinMode(sensorPin, INPUT_PULLUP);
+    pinMode(statusLedPin, OUTPUT);
+    digitalWrite(statusLedPin, ledOff);
 
     wifiSetUp();
     delay(1000);
     mailSetUp();
 
-    onBootTankStatus();
+    verifyInitialTankStatus();
 
-    attachInterrupt(digitalPinToInterrupt(SENSOR_PIN), isrChange, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(sensorPin), handleSensorInterrupt, CHANGE);
 }
 
 void loop() {
     monitorWiFiConnection();
 
-    if (sensorIrq) {
+    if (isSensorTriggered) {
         delay(50); 
         checkTankStatus(); 
-        sensorIrq = false; 
+        isSensorTriggered = false; 
     }
 }

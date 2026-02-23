@@ -2,6 +2,7 @@
 #define MAIL_UTILS_H
 
 #include <Arduino.h>
+#include "../include/env.h"
 
 void mailSetUp();
 void sendEmail(String subject, String messageText);
