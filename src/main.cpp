@@ -4,7 +4,6 @@
 
 
 
-
 volatile bool sensorIrq = false;
 
 void IRAM_ATTR isrChange() {
@@ -25,10 +24,19 @@ void checkTankStatus() {
     }
 }
 
-void onBootTankStatus() {
-    checkTankStatus();
-    Serial.println("onBootTankStatus");
-    sendEmail("Inital: First check on boot", "The gas tank is ...");
+void onBootTankStatus() {    
+    int sensorState = digitalRead(SENSOR_PIN);
+
+    if (sensorState == TANK_EMPTY) {
+        digitalWrite(STATUS_LED, LED_ON);
+        Serial.println("Boot status: Tank Empty");
+        sendEmail("Initial: First check on boot", "The gas tank is EMPTY. Please order a replacement.");
+    } 
+    else { 
+        digitalWrite(STATUS_LED, LED_OFF);
+        Serial.println("Boot status: Tank Full");
+        sendEmail("Initial: First check on boot", "The gas tank is FULL. Everything is OK.");
+    }
 }
 
 void setup() {
