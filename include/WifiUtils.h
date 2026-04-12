@@ -1,14 +1,14 @@
 #ifndef WIFIUTILS_H
 #define WIFIUTILS_H
 
-
 #include <Arduino.h>
 #include <WiFi.h>
 #include "../include/env.h"
 
 // Hardware Pins & States
 constexpr uint8_t statusLedPin = 8;
-constexpr uint8_t sensorPin = 10;
+constexpr uint8_t sensor1Pin = 10;
+constexpr uint8_t sensor2Pin = 2; // החיישן החדש
 
 constexpr uint8_t tankFullState = HIGH; // Circuit open 
 constexpr uint8_t tankEmptyState = LOW; // Circuit close 
