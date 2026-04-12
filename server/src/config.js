@@ -22,7 +22,9 @@ module.exports = {
   },
 
   sensors: {
-    // Mark a sensor OFFLINE if it has not reported within this window
-    offlineThresholdMs: parseInt(process.env.OFFLINE_THRESHOLD_MS) || 60_000, // 60 seconds
+    // Mark a sensor OFFLINE if it has not reported within this window.
+    // Default is 25 hours — suitable for once-a-day reporting with some drift tolerance.
+    // For more frequent reporting, lower this value (e.g. 60_000 for every-minute reports).
+    offlineThresholdMs: parseInt(process.env.OFFLINE_THRESHOLD_MS) || 25 * 60 * 60 * 1000, // 25 hours
   },
 };
