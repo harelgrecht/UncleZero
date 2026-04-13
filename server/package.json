@@ -1,0 +1,19 @@
+{
+  "name": "uncle-zero-server",
+  "version": "1.0.0",
+  "description": "Gas pressure monitoring server — receives ESP32 sensor reports and serves a real-time dashboard.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}

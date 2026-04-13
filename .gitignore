@@ -4,3 +4,7 @@
 .vscode/launch.json
 .vscode/ipch
 .vscode-ctags
+
+# Server
+server/node_modules/
+server/data/
