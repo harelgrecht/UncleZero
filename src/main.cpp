@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include "../include/WifiUtils.h"
-#include "../include/MailUtils.h"
 
 volatile bool isSensor1Triggered = false;
 volatile bool isSensor2Triggered = false;
@@ -30,10 +29,7 @@ void processTankEvent(uint8_t pin, const String& tankName) {
 
     if (currentState == tankEmptyState) {
         Serial.println("Tank Empty - Low Pressure: " + tankName);
-        String subject = "URGENT: " + tankName + " is Empty!";
-        String body = "The " + tankName + " is currently empty. Please order a replacement.";
-        sendEmail(subject, body);
-    } 
+    }
     else { 
         Serial.println("Tank Full - Pressure OK: " + tankName);
     }
@@ -51,7 +47,6 @@ void verifyInitialTankStatus() {
     
     Serial.println("Boot status:");
     Serial.println(bootMessage);
-    sendEmail("Initial Check: System Online", bootMessage);
 }
 
 void setup() {
@@ -66,7 +61,6 @@ void setup() {
 
     wifiSetUp();
     delay(1000);
-    mailSetUp();
 
     verifyInitialTankStatus();
 
