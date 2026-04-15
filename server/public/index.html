@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UncleZero — Gas Pressure Monitor</title>
+  <style>
+    /* =========================================================================
+       Design Tokens  —  edit these to retheme the entire dashboard
+       ========================================================================= */
+    :root {
+      --bg-base:       #0d1117;
+      --bg-card:       #161b22;
+      --bg-card-hover: #1c2128;
+      --border:        #30363d;
+      --border-subtle: #21262d;
+
+      --text-primary:   #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted:     #484f58;
+
+      --green:         #3fb950;
+      --green-bg:      rgba(63, 185, 80, 0.12);
+      --green-glow:    rgba(63, 185, 80, 0.25);
+
+      --red:           #f85149;
+      --red-bg:        rgba(248, 81, 73, 0.12);
+      --red-glow:      rgba(248, 81, 73, 0.30);
+
+      --yellow:        #e3b341;
+      --yellow-bg:     rgba(227, 179, 65, 0.12);
+
+      --blue:          #388bfd;
+      --blue-bg:       rgba(56, 139, 253, 0.12);
+
+      --radius:   8px;
+      --radius-lg: 12px;
+    }
+
+    /* =========================================================================
+       Reset & Base
+       ========================================================================= */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* =========================================================================
+       Header
+       ========================================================================= */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 60px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .header-brand .logo {
+      width: 28px;
+      height: 28px;
+      background: var(--red);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .header-brand .subtitle {
+      color: var(--text-secondary);
+      font-weight: 400;
+      font-size: 13px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* Live connection badge */
+    .connection-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      transition: all 0.3s;
+    }
+    .connection-badge.connected    { color: var(--green); border-color: var(--green-bg); background: var(--green-bg); }
+    .connection-badge.disconnected { color: var(--red);   border-color: var(--red-bg);   background: var(--red-bg);   }
+
+    .connection-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .connection-badge.connected .connection-dot {
+      animation: pulse-dot 2s infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    .clock {
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* =========================================================================
+       Stats Bar
+       ========================================================================= */
+    .stats-bar {
+      display: flex;
+      gap: 12px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .stat-chip {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid transparent;
+    }
+    .stat-chip.ok       { background: var(--green-bg);  color: var(--green);  border-color: rgba(63,185,80,0.2); }
+    .stat-chip.empty    { background: var(--red-bg);    color: var(--red);    border-color: rgba(248,81,73,0.2); }
+    .stat-chip.offline  { background: var(--yellow-bg); color: var(--yellow); border-color: rgba(227,179,65,0.2); }
+    .stat-chip.devices  { background: var(--blue-bg);   color: var(--blue);   border-color: rgba(56,139,253,0.2); }
+
+    .stat-chip .count {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    /* =========================================================================
+       Main Layout
+       ========================================================================= */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 0;
+      min-height: calc(100vh - 60px - 46px);
+    }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    /* =========================================================================
+       Left Panel — Device Grid
+       ========================================================================= */
+    .devices-panel {
+      padding: 24px;
+      border-right: 1px solid var(--border-subtle);
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .device-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+
+    /* Empty state */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+    .empty-state .empty-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+      opacity: 0.4;
+    }
+    .empty-state p { font-size: 13px; }
+
+    /* ── Device Card ── */
+    .device-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: box-shadow 0.3s, border-color 0.3s;
+    }
+    .device-card:hover {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 1px var(--blue), 0 4px 16px rgba(0,0,0,0.4);
+    }
+    .device-card.has-alert {
+      border-color: var(--red);
+      box-shadow: 0 0 12px var(--red-glow);
+    }
+
+    .device-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .device-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .device-id {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: 'SF Mono', 'Cascadia Code', monospace;
+    }
+
+    .device-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+
+    .rssi-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 14px;
+    }
+    .rssi-bar {
+      width: 4px;
+      border-radius: 1px;
+      background: var(--border);
+      transition: background 0.4s;
+    }
+    .rssi-bar:nth-child(1) { height: 4px; }
+    .rssi-bar:nth-child(2) { height: 7px; }
+    .rssi-bar:nth-child(3) { height: 10px; }
+    .rssi-bar:nth-child(4) { height: 14px; }
+    .rssi-bar.active       { background: var(--green); }
+    .rssi-bar.active.fair  { background: var(--yellow); }
+    .rssi-bar.active.poor  { background: var(--red); }
+
+    .last-seen {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .device-sensors {
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* ── Sensor Row ── */
+    .sensor-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-base);
+      transition: border-color 0.3s, background 0.3s;
+    }
+    .sensor-row.status-EMPTY {
+      border-color: rgba(248,81,73,0.3);
+      background: var(--red-bg);
+      animation: alert-pulse 2s infinite;
+    }
+    .sensor-row.status-OFFLINE {
+      border-color: rgba(227,179,65,0.3);
+      background: var(--yellow-bg);
+    }
+
+    @keyframes alert-pulse {
+      0%, 100% { box-shadow: none; }
+      50%       { box-shadow: 0 0 8px var(--red-glow); }
+    }
+
+    .sensor-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .sensor-label strong {
+      display: block;
+      font-size: 13px;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .sensor-status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+    .sensor-status-badge.OK      { color: var(--green);  background: var(--green-bg); }
+    .sensor-status-badge.EMPTY   { color: var(--red);    background: var(--red-bg);   }
+    .sensor-status-badge.OFFLINE { color: var(--yellow); background: var(--yellow-bg); }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .sensor-status-badge.EMPTY .status-dot {
+      animation: pulse-dot 1s infinite;
+    }
+
+    /* =========================================================================
+       Right Panel — Alert Feed
+       ========================================================================= */
+    .alerts-panel {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .alert-feed {
+      flex: 1;
+      overflow-y: auto;
+      max-height: calc(100vh - 180px);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* Custom scrollbar */
+    .alert-feed::-webkit-scrollbar       { width: 4px; }
+    .alert-feed::-webkit-scrollbar-track { background: transparent; }
+    .alert-feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .alert-item {
+      display: flex;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-subtle);
+      border-left-width: 3px;
+      background: var(--bg-card);
+      transition: opacity 0.3s;
+    }
+    .alert-item.TANK_EMPTY    { border-left-color: var(--red);   }
+    .alert-item.TANK_RESTORED { border-left-color: var(--green); }
+    .alert-item.new-alert     { animation: slide-in 0.3s ease-out; }
+
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .alert-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+
+    .alert-body { flex: 1; min-width: 0; }
+    .alert-event {
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .alert-item.TANK_EMPTY    .alert-event { color: var(--red);   }
+    .alert-item.TANK_RESTORED .alert-event { color: var(--green); }
+
+    .alert-detail {
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .alert-time {
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+      margin-top: 2px;
+    }
+
+    .no-alerts {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ────────────────────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="logo">&#x1F525;</div>
+      <div>
+        UncleZero
+        <span class="subtitle">Gas Pressure Monitor</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="connection-badge" class="connection-badge disconnected">
+        <div class="connection-dot"></div>
+        <span id="connection-label">Connecting...</span>
+      </div>
+      <div class="clock" id="clock"></div>
+    </div>
+  </header>
+
+  <!-- ── Stats Bar ─────────────────────────────────────────────────────────── -->
+  <div class="stats-bar">
+    <div class="stat-chip devices">
+      <span>Devices</span>
+      <span class="count" id="stat-devices">0</span>
+    </div>
+    <div class="stat-chip ok">
+      <span>OK</span>
+      <span class="count" id="stat-ok">0</span>
+    </div>
+    <div class="stat-chip empty">
+      <span>Empty</span>
+      <span class="count" id="stat-empty">0</span>
+    </div>
+    <div class="stat-chip offline">
+      <span>Offline</span>
+      <span class="count" id="stat-offline">0</span>
+    </div>
+  </div>
+
+  <!-- ── Main Layout ───────────────────────────────────────────────────────── -->
+  <div class="layout">
+
+    <!-- Sensor Device Cards -->
+    <section class="devices-panel">
+      <div class="panel-title">Devices &amp; Sensors</div>
+      <div class="device-grid" id="device-grid">
+        <div class="empty-state">
+          <div class="empty-icon">&#x1F4E1;</div>
+          <p>Waiting for devices to connect...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Alert Feed -->
+    <section class="alerts-panel">
+      <div class="panel-title">Alert Feed</div>
+      <div class="alert-feed" id="alert-feed">
+        <div class="no-alerts">No alerts yet.</div>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/dashboard.js"></script>
+</body>
+</html>
