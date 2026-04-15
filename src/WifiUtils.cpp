@@ -35,7 +35,7 @@ void wifiSetUp() {
     delay(1000); 
 
     WiFi.mode(WIFI_STA);
-    WiFi.setTxPower(WIFI_POWER_8_5dBm); // Prevent brownout
+    WiFi.setTxPower(WIFI_POWER_11dBm); // Stable mid-range power
     WiFi.begin(wifiSsid, wifiPassword);
 
     int connectionAttempts = 0;
@@ -52,10 +52,11 @@ void wifiSetUp() {
     digitalWrite(statusLedPin, ledOff); 
 
     if (WiFi.status() == WL_CONNECTED) {
-        WiFi.setTxPower(WIFI_POWER_19_5dBm); // Restore TX power
         Serial.println("\nWiFi connected!");
-        Serial.print("IP address: ");
+        Serial.print("IP address/Su: ");
         Serial.println(WiFi.localIP());
+        Serial.print("Subnet Mask: ");
+        Serial.println(WiFi.subnetMask());
     } else {
         Serial.println("\nConnection Failed! Restarting...");
         delay(3000);
@@ -71,9 +72,8 @@ void monitorWiFiConnection() {
         lastCheckTime = millis();
 
         if (WiFi.status() != WL_CONNECTED) {
-            Serial.println("Connection lost! Reconnecting...");
-            WiFi.disconnect();
-            WiFi.reconnect();
+            Serial.println("Connection lost! Reconnecting...\tWiFi status: " + String(WiFi.status()));
+            wifiSetUp();
         } else {
             Serial.printf("WiFi Stable | RSSI: %d dBm\n", WiFi.RSSI());
         }
