@@ -4,6 +4,7 @@
 .vscode/launch.json
 .vscode/ipch
 .vscode-ctags
+include/env.h
 
 # Server
 server/node_modules/

@@ -1,28 +1,85 @@
 #include <Arduino.h>
-#include "../include/utils.h"
+#include "../include/WifiUtils.h"
+
+volatile bool isSensor1Triggered = false;
+volatile bool isSensor2Triggered = false;
+
+void IRAM_ATTR handleSensor1Interrupt() {
+    isSensor1Triggered = true;
+}
+
+void IRAM_ATTR handleSensor2Interrupt() {
+    isSensor2Triggered = true;
+}
+
+void updateAlertLed() {
+    int state1 = digitalRead(sensor1Pin);
+    int state2 = digitalRead(sensor2Pin);
+
+    if (state1 == tankEmptyState || state2 == tankEmptyState) {
+        digitalWrite(statusLedPin, ledOn);
+    } else {
+        digitalWrite(statusLedPin, ledOff);
+    }
+}
+
+void processTankEvent(uint8_t pin, const String& tankName) {
+    int currentState = digitalRead(pin);
+    updateAlertLed(); 
+
+    if (currentState == tankEmptyState) {
+        Serial.println("Tank Empty - Low Pressure: " + tankName);
+    }
+    else { 
+        Serial.println("Tank Full - Pressure OK: " + tankName);
+    }
+}
+
+void verifyInitialTankStatus() {    
+    int state1 = digitalRead(sensor1Pin);
+    int state2 = digitalRead(sensor2Pin);
+    
+    updateAlertLed();
+
+    String bootMessage = "System booted successfully.\n\n";
+    bootMessage += "Tank 1: " + String(state1 == tankEmptyState ? "EMPTY" : "FULL") + "\n";
+    bootMessage += "Tank 2: " + String(state2 == tankEmptyState ? "EMPTY" : "FULL") + "\n";
+    
+    Serial.println("Boot status:");
+    Serial.println(bootMessage);
+}
 
 void setup() {
     Serial.begin(115200);
-    delay(5000);
-    pinMode(SENSOR_PIN, INPUT_PULLUP);
-    pinMode(STATUS_LED, OUTPUT);
+    delay(3000);
 
-    //wifiSetUp();
+    pinMode(sensor1Pin, INPUT_PULLUP);
+    pinMode(sensor2Pin, INPUT_PULLUP);
+    
+    pinMode(statusLedPin, OUTPUT);
+    digitalWrite(statusLedPin, ledOff);
 
+    wifiSetUp();
+    delay(1000);
+
+    verifyInitialTankStatus();
+
+    attachInterrupt(digitalPinToInterrupt(sensor1Pin), handleSensor1Interrupt, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(sensor2Pin), handleSensor2Interrupt, CHANGE);
 }
 
 void loop() {
     monitorWiFiConnection();
-    int sensorState = digitalRead(SENSOR_PIN);
 
-    if (sensorState == TANK_EMPTY) {
-        digitalWrite(STATUS_LED, LOW);
-        Serial.println("Gas tank Empty - Low Pressure");
-    } 
-    else { // TANK_FULL
-        digitalWrite(STATUS_LED, HIGH);
-        Serial.println("Tank Full - Pressure OK");
+    if (isSensor1Triggered) {
+        delay(50);
+        processTankEvent(sensor1Pin, "Tank 1"); 
+        isSensor1Triggered = false; 
     }
-    
-    delay(1000);
+
+    if (isSensor2Triggered) {
+        delay(50);
+        processTankEvent(sensor2Pin, "Tank 2"); 
+        isSensor2Triggered = false; 
+    }
 }
