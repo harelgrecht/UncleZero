@@ -1,85 +1,38 @@
 #include <Arduino.h>
+#include "../include/Config.h"
 #include "../include/WifiUtils.h"
-
-volatile bool isSensor1Triggered = false;
-volatile bool isSensor2Triggered = false;
-
-void IRAM_ATTR handleSensor1Interrupt() {
-    isSensor1Triggered = true;
-}
-
-void IRAM_ATTR handleSensor2Interrupt() {
-    isSensor2Triggered = true;
-}
-
-void updateAlertLed() {
-    int state1 = digitalRead(sensor1Pin);
-    int state2 = digitalRead(sensor2Pin);
-
-    if (state1 == tankEmptyState || state2 == tankEmptyState) {
-        digitalWrite(statusLedPin, ledOn);
-    } else {
-        digitalWrite(statusLedPin, ledOff);
-    }
-}
-
-void processTankEvent(uint8_t pin, const String& tankName) {
-    int currentState = digitalRead(pin);
-    updateAlertLed(); 
-
-    if (currentState == tankEmptyState) {
-        Serial.println("Tank Empty - Low Pressure: " + tankName);
-    }
-    else { 
-        Serial.println("Tank Full - Pressure OK: " + tankName);
-    }
-}
-
-void verifyInitialTankStatus() {    
-    int state1 = digitalRead(sensor1Pin);
-    int state2 = digitalRead(sensor2Pin);
-    
-    updateAlertLed();
-
-    String bootMessage = "System booted successfully.\n\n";
-    bootMessage += "Tank 1: " + String(state1 == tankEmptyState ? "EMPTY" : "FULL") + "\n";
-    bootMessage += "Tank 2: " + String(state2 == tankEmptyState ? "EMPTY" : "FULL") + "\n";
-    
-    Serial.println("Boot status:");
-    Serial.println(bootMessage);
-}
+#include "../include/TankLogic.h"
+#include "../include/PowerUtils.h"
 
 void setup() {
     Serial.begin(115200);
-    delay(3000);
-
+    delay(1000);
     pinMode(sensor1Pin, INPUT_PULLUP);
     pinMode(sensor2Pin, INPUT_PULLUP);
-    
+    pinMode(devModePin, INPUT_PULLUP);
     pinMode(statusLedPin, OUTPUT);
     digitalWrite(statusLedPin, ledOff);
 
+    if (digitalRead(devModePin) == LOW) {
+        Serial.println("\r\n[MAINTENANCE MODE] firmware update pin is LOW!");
+        Serial.println("System is staying awake endlessly. You can upload firmware now!");
+        digitalWrite(statusLedPin, ledOn); 
+        while (true) {
+            delay(100);
+        }
+    }
+
     wifiSetUp();
-    delay(1000);
+    
+    if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) {
+        syncNtpTime();
+    }
 
-    verifyInitialTankStatus();
+    printWakeupReason();
 
-    attachInterrupt(digitalPinToInterrupt(sensor1Pin), handleSensor1Interrupt, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(sensor2Pin), handleSensor2Interrupt, CHANGE);
+    goToSleep();
 }
 
 void loop() {
-    monitorWiFiConnection();
-
-    if (isSensor1Triggered) {
-        delay(50);
-        processTankEvent(sensor1Pin, "Tank 1"); 
-        isSensor1Triggered = false; 
-    }
-
-    if (isSensor2Triggered) {
-        delay(50);
-        processTankEvent(sensor2Pin, "Tank 2"); 
-        isSensor2Triggered = false; 
-    }
+    // Left empty intentionally. System operates on Deep Sleep architecture.
 }

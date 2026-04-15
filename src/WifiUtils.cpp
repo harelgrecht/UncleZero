@@ -1,7 +1,10 @@
+#include <WiFi.h>
 #include "../include/WifiUtils.h"
+#include "../include/Config.h"
+#include "../include/env.h"
 
 void wifiScanNetworks() {   
-    Serial.println("\n--- WiFi Scan ---");
+    Serial.println("\r\n--- WiFi Scan ---");
 
     WiFi.disconnect(true, true);
     delay(100);
@@ -16,9 +19,9 @@ void wifiScanNetworks() {
     } else if (networkCount > 0) {
         Serial.print(networkCount);
         Serial.println(" networks found:");
-        Serial.printf("%d networks found:\n", networkCount);
+        Serial.printf("%d networks found:\r\n", networkCount);
         for (int i = 0; i < networkCount; ++i) {
-            Serial.printf("[%d] %s | %d dBm\n", i + 1, WiFi.SSID(i).c_str(), WiFi.RSSI(i));
+            Serial.printf("[%d] %s | %d dBm\r\n", i + 1, WiFi.SSID(i).c_str(), WiFi.RSSI(i));
             delay(10);
         }
     }
@@ -29,7 +32,7 @@ void wifiScanNetworks() {
 void wifiSetUp() {
     wifiScanNetworks();
 
-    Serial.printf("\nConnecting to %s\n", wifiSsid);
+    Serial.printf("\r\nConnecting to %s\r\n", wifiSsid);
 
     WiFi.disconnect(true, true);
     delay(1000); 
@@ -53,11 +56,11 @@ void wifiSetUp() {
 
     if (WiFi.status() == WL_CONNECTED) {
         WiFi.setTxPower(WIFI_POWER_19_5dBm); // Restore TX power
-        Serial.println("\nWiFi connected!");
+        Serial.println("\r\nWiFi connected!");
         Serial.print("IP address: ");
         Serial.println(WiFi.localIP());
     } else {
-        Serial.println("\nConnection Failed! Restarting...");
+        Serial.println("\r\nConnection Failed! Restarting...");
         delay(3000);
         ESP.restart();
     }
@@ -75,7 +78,7 @@ void monitorWiFiConnection() {
             WiFi.disconnect();
             WiFi.reconnect();
         } else {
-            Serial.printf("WiFi Stable | RSSI: %d dBm\n", WiFi.RSSI());
+            Serial.printf("WiFi Stable | RSSI: %d dBm\r\n", WiFi.RSSI());
         }
     }
 }
