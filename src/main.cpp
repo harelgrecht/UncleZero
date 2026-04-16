@@ -140,6 +140,20 @@ void setup() {
         syncNtpTime();
     }
 
+    if (isWebAlwaysOn()) {
+        startAlwaysOnServer();
+        verifyInitialTankStatus();
+        unsigned long lastReport = 0;
+        while (true) {
+            handleAlwaysOnClients();
+            if (millis() - lastReport > 30000) {
+                lastReport = millis();
+                verifyInitialTankStatus();
+            }
+            delay(5);
+        }
+    }
+
     printWakeupReason();
 
     goToSleep();
