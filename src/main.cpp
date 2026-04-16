@@ -1,5 +1,8 @@
 #include <Arduino.h>
+#include "../include/Config.h"
 #include "../include/WifiUtils.h"
+#include "../include/TankLogic.h"
+#include "../include/PowerUtils.h"
 
 volatile bool isSensor1Triggered = false;
 volatile bool isSensor2Triggered = false;
@@ -97,35 +100,33 @@ void verifyInitialTankStatus() {
 
 void setup() {
     Serial.begin(115200);
-    delay(3000);
-
+    delay(1000);
     pinMode(sensor1Pin, INPUT_PULLUP);
     pinMode(sensor2Pin, INPUT_PULLUP);
-    
+    pinMode(devModePin, INPUT_PULLUP);
     pinMode(statusLedPin, OUTPUT);
     digitalWrite(statusLedPin, ledOff);
 
+    if (digitalRead(devModePin) == LOW) {
+        Serial.println("\r\n[MAINTENANCE MODE] firmware update pin is LOW!");
+        Serial.println("System is staying awake endlessly. You can upload firmware now!");
+        digitalWrite(statusLedPin, ledOn); 
+        while (true) {
+            delay(100);
+        }
+    }
+
     wifiSetUp();
-    delay(1000);
+    
+    if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) {
+        syncNtpTime();
+    }
 
-    verifyInitialTankStatus();
+    printWakeupReason();
 
-    attachInterrupt(digitalPinToInterrupt(sensor1Pin), handleSensor1Interrupt, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(sensor2Pin), handleSensor2Interrupt, CHANGE);
+    goToSleep();
 }
 
 void loop() {
-    monitorWiFiConnection();
-
-    if (isSensor1Triggered) {
-        delay(50);
-        processTankEvent(sensor1Pin, "Tank 1"); 
-        isSensor1Triggered = false; 
-    }
-
-    if (isSensor2Triggered) {
-        delay(50);
-        processTankEvent(sensor2Pin, "Tank 2"); 
-        isSensor2Triggered = false; 
-    }
+    // Left empty intentionally. System operates on Deep Sleep architecture.
 }
