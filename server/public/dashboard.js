@@ -22,6 +22,29 @@ const sensors = new Map();
 const devices = new Map();
 
 // ---------------------------------------------------------------------------
+// Auth Utilities
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrapper around fetch() that redirects to /login on a 401 response.
+ * Use this for all API calls in this file.
+ */
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    window.location.href = '/login';
+    return null;
+  }
+  return res;
+}
+
+/** Sign out the current user and return to the login page. */
+async function logout() {
+  await fetch('/auth/logout', { method: 'POST' });
+  window.location.href = '/login';
+}
+
+// ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
 
@@ -30,9 +53,8 @@ const devices = new Map();
  * If the event was today, shows only HH:MM:SS. Otherwise shows the date too.
  */
 function formatTime(timestampMs) {
-  const date = new Date(timestampMs);
-  const now  = new Date();
-  const isToday = date.toDateString() === now.toDateString();
+  const date    = new Date(timestampMs);
+  const isToday = date.toDateString() === new Date().toDateString();
 
   if (isToday) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -68,8 +90,7 @@ function rssiToLevel(rssi) {
 
 function rssiQuality(rssi) {
   const level = rssiToLevel(rssi);
-  if (level >= 4) return '';
-  if (level === 3) return '';
+  if (level >= 3) return '';
   if (level === 2) return 'fair';
   return 'poor';
 }
@@ -92,12 +113,43 @@ function eventLabel(event) {
 }
 
 // ---------------------------------------------------------------------------
+// Header: show current user + logout button
+// ---------------------------------------------------------------------------
+
+async function loadCurrentUser() {
+  const res = await apiFetch('/auth/me');
+  if (!res) return;
+
+  const data = await res.json();
+  if (data.username) {
+    const headerRight = document.getElementById('header-right');
+    const userEl = document.createElement('span');
+    userEl.style.cssText = 'font-size:12px;color:var(--text-secondary)';
+    userEl.textContent = data.username;
+
+    const logoutBtn = document.createElement('button');
+    logoutBtn.textContent = 'Sign out';
+    logoutBtn.style.cssText = `
+      font-size: 12px; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+      background: transparent; color: var(--text-secondary);
+      border: 1px solid var(--border); transition: color 0.2s, border-color 0.2s;
+    `;
+    logoutBtn.onmouseover = () => { logoutBtn.style.color = 'var(--text-primary)'; logoutBtn.style.borderColor = 'var(--text-secondary)'; };
+    logoutBtn.onmouseout  = () => { logoutBtn.style.color = 'var(--text-secondary)'; logoutBtn.style.borderColor = 'var(--border)'; };
+    logoutBtn.addEventListener('click', logout);
+
+    headerRight.prepend(logoutBtn);
+    headerRight.prepend(userEl);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Stats Bar
 // ---------------------------------------------------------------------------
 
 function updateStats() {
-  const allSensors = [...sensors.values()];
-  const deviceCount = devices.size;
+  const allSensors   = [...sensors.values()];
+  const deviceCount  = devices.size;
   const okCount      = allSensors.filter(s => s.status === 'OK').length;
   const emptyCount   = allSensors.filter(s => s.status === 'EMPTY').length;
   const offlineCount = allSensors.filter(s => s.status === 'OFFLINE').length;
@@ -112,10 +164,6 @@ function updateStats() {
 // Device Card Rendering
 // ---------------------------------------------------------------------------
 
-/**
- * Build the HTML for a single sensor row inside a device card.
- * @param {object} sensor
- */
 function sensorRowHtml(sensor) {
   return `
     <div class="sensor-row status-${sensor.status}" id="sensor-${sensor.id.replace(/[^a-z0-9]/gi, '-')}">
@@ -131,15 +179,10 @@ function sensorRowHtml(sensor) {
   `;
 }
 
-/**
- * Build the full HTML for a device card.
- * @param {string}   deviceId
- * @param {object[]} deviceSensors  — all sensors belonging to this device
- */
 function deviceCardHtml(deviceId, deviceSensors) {
-  const hasAlert  = deviceSensors.some(s => s.status === 'EMPTY');
-  const latestTs  = Math.max(...deviceSensors.map(s => s.last_seen));
-  const rssi      = deviceSensors[0]?.rssi;
+  const hasAlert = deviceSensors.some(s => s.status === 'EMPTY');
+  const latestTs = Math.max(...deviceSensors.map(s => s.last_seen));
+  const rssi     = deviceSensors[0]?.rssi;
 
   return `
     <div class="device-card ${hasAlert ? 'has-alert' : ''}" id="device-${deviceId.replace(/[^a-z0-9]/gi, '-')}">
@@ -162,7 +205,6 @@ function deviceCardHtml(deviceId, deviceSensors) {
   `;
 }
 
-/** Re-render the entire device grid from the current state maps. */
 function renderDeviceGrid() {
   const grid = document.getElementById('device-grid');
 
@@ -180,20 +222,11 @@ function renderDeviceGrid() {
     .join('');
 }
 
-/**
- * Apply a partial update to a device card that already exists in the DOM,
- * avoiding a full grid re-render (reduces flicker on rapid updates).
- * @param {string}   deviceId
- * @param {object[]} updatedSensors  — sensors that changed in this report
- * @param {number}   rssi
- * @param {number}   timestamp
- */
 function patchDeviceCard(deviceId, updatedSensors, rssi, timestamp) {
   const cardId = `device-${deviceId.replace(/[^a-z0-9]/gi, '-')}`;
   const card   = document.getElementById(cardId);
   if (!card) { renderDeviceGrid(); return; }
 
-  // Update each changed sensor row
   for (const updated of updatedSensors) {
     const rowId  = `sensor-${updated.sensorId.replace(/[^a-z0-9]/gi, '-')}`;
     const row    = document.getElementById(rowId);
@@ -208,11 +241,9 @@ function patchDeviceCard(deviceId, updatedSensors, rssi, timestamp) {
     }
   }
 
-  // Update card-level alert highlight
-  const hasAlert = [...devices.get(deviceId) || []].some(s => s.status === 'EMPTY');
+  const hasAlert = [...(devices.get(deviceId) || [])].some(s => s.status === 'EMPTY');
   card.classList.toggle('has-alert', hasAlert);
 
-  // Update RSSI and last-seen
   const metaEl = card.querySelector('.device-meta');
   if (metaEl) {
     metaEl.innerHTML = `
@@ -228,13 +259,11 @@ function patchDeviceCard(deviceId, updatedSensors, rssi, timestamp) {
 
 const MAX_FEED_ITEMS = 100;
 
-/** Prepend a new alert item to the top of the feed. */
 function prependAlert(alert, animate = false) {
-  const feed    = document.getElementById('alert-feed');
+  const feed     = document.getElementById('alert-feed');
   const noAlerts = feed.querySelector('.no-alerts');
   if (noAlerts) noAlerts.remove();
 
-  // Remove oldest if we're over the cap
   while (feed.children.length >= MAX_FEED_ITEMS) {
     feed.removeChild(feed.lastChild);
   }
@@ -252,34 +281,20 @@ function prependAlert(alert, animate = false) {
   feed.insertBefore(item, feed.firstChild);
 }
 
-/** Populate the alert feed from the initial API response (no animation). */
 function populateAlertFeed(alerts) {
-  const feed = document.getElementById('alert-feed');
   if (!alerts.length) return;
-
-  feed.innerHTML = '';
-  // API returns newest-first; render them in that order
-  alerts.forEach(a => prependAlert(a, false));
-
-  // After initial load, flip so newest is on top and re-insert in order
-  feed.innerHTML = '';
+  document.getElementById('alert-feed').innerHTML = '';
   [...alerts].reverse().forEach(a => prependAlert(a, false));
 }
 
 // ---------------------------------------------------------------------------
 // State Synchronisation
-// Apply a sensor update from either the initial API call or a socket event.
 // ---------------------------------------------------------------------------
 
-/**
- * Merge incoming sensor data into our state maps.
- * @param {object[]} sensorList  — array of sensor objects (from API or socket event)
- */
 function mergeSensors(sensorList) {
   for (const sensor of sensorList) {
     sensors.set(sensor.id, sensor);
 
-    // Keep the device → sensors[] index up to date
     const deviceSensors = devices.get(sensor.device_id) || [];
     const existing = deviceSensors.findIndex(s => s.id === sensor.id);
     if (existing >= 0) {
@@ -297,38 +312,44 @@ function mergeSensors(sensorList) {
 // ---------------------------------------------------------------------------
 
 function connectSocket() {
+  // The JWT cookie is sent automatically with the WebSocket upgrade request —
+  // no need to pass it manually here.
   const socket = io();
   const badge  = document.getElementById('connection-badge');
   const label  = document.getElementById('connection-label');
 
   socket.on('connect', () => {
-    badge.className = 'connection-badge connected';
+    badge.className   = 'connection-badge connected';
     label.textContent = 'Live';
   });
 
   socket.on('disconnect', () => {
-    badge.className = 'connection-badge disconnected';
+    badge.className   = 'connection-badge disconnected';
     label.textContent = 'Reconnecting...';
   });
 
-  // Fired by sensorService whenever an ESP32 sends a report
+  // Redirect to login if the server rejects the socket (expired/invalid JWT)
+  socket.on('connect_error', (err) => {
+    if (err.message.includes('Authentication') || err.message.includes('Session')) {
+      window.location.href = '/login';
+    }
+  });
+
   socket.on('sensor:update', (event) => {
-    // Rebuild full sensor objects from partial update + existing state
     for (const updated of event.sensors) {
       const existing = sensors.get(updated.sensorId) || {};
       sensors.set(updated.sensorId, {
         ...existing,
-        id:        updated.sensorId,
-        device_id: event.deviceId,
+        id:         updated.sensorId,
+        device_id:  event.deviceId,
         sensor_num: updated.sensorNum,
-        status:    updated.status,
-        rssi:      event.rssi,
-        last_seen: event.timestamp,
+        status:     updated.status,
+        rssi:       event.rssi,
+        last_seen:  event.timestamp,
       });
 
-      // Update device index
       const deviceSensors = devices.get(event.deviceId) || [];
-      const idx = deviceSensors.findIndex(s => s.id === updated.sensorId);
+      const idx  = deviceSensors.findIndex(s => s.id === updated.sensorId);
       const full = sensors.get(updated.sensorId);
       if (idx >= 0) deviceSensors[idx] = full;
       else          deviceSensors.push(full);
@@ -339,7 +360,6 @@ function connectSocket() {
     patchDeviceCard(event.deviceId, event.sensors, event.rssi, event.timestamp);
     updateStats();
 
-    // Add any new alerts to the top of the feed
     for (const alert of event.alerts) {
       prependAlert(alert, true);
     }
@@ -352,9 +372,17 @@ function connectSocket() {
 
 async function loadInitialState() {
   try {
+    const [sensorsRes, alertsRes] = await Promise.all([
+      apiFetch('/api/sensors'),
+      apiFetch('/api/alerts?limit=50'),
+    ]);
+
+    // apiFetch returns null and redirects on 401
+    if (!sensorsRes || !alertsRes) return;
+
     const [sensorData, alertData] = await Promise.all([
-      fetch('/api/sensors').then(r => r.json()),
-      fetch('/api/alerts?limit=50').then(r => r.json()),
+      sensorsRes.json(),
+      alertsRes.json(),
     ]);
 
     mergeSensors(sensorData);
@@ -373,8 +401,6 @@ async function loadInitialState() {
 function startClock() {
   function tick() {
     document.getElementById('clock').textContent = new Date().toLocaleTimeString();
-
-    // Refresh "X ago" labels without touching the rest of the DOM
     document.querySelectorAll('[data-ts]').forEach(el => {
       el.textContent = timeAgo(parseInt(el.dataset.ts, 10));
     });
@@ -387,6 +413,7 @@ function startClock() {
 // Boot
 // ---------------------------------------------------------------------------
 
+loadCurrentUser();
 loadInitialState();
 connectSocket();
 startClock();
