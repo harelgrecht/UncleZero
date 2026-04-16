@@ -3,6 +3,7 @@
 #include "../include/WifiUtils.h"
 #include "../include/TankLogic.h"
 #include "../include/PowerUtils.h"
+#include "../include/ConfigMode.h"
 
 volatile bool isSensor1Triggered = false;
 volatile bool isSensor2Triggered = false;
@@ -15,16 +16,6 @@ void IRAM_ATTR handleSensor2Interrupt() {
     isSensor2Triggered = true;
 }
 
-void updateAlertLed() {
-    int state1 = digitalRead(sensor1Pin);
-    int state2 = digitalRead(sensor2Pin);
-
-    if (state1 == tankEmptyState || state2 == tankEmptyState) {
-        digitalWrite(statusLedPin, ledOn);
-    } else {
-        digitalWrite(statusLedPin, ledOff);
-    }
-}
 
 
 void reportTankStatusToServer(const String& tankName, const String& status) {
@@ -108,15 +99,42 @@ void setup() {
     digitalWrite(statusLedPin, ledOff);
 
     if (digitalRead(devModePin) == LOW) {
-        Serial.println("\r\n[MAINTENANCE MODE] firmware update pin is LOW!");
-        Serial.println("System is staying awake endlessly. You can upload firmware now!");
-        digitalWrite(statusLedPin, ledOn); 
-        while (true) {
-            delay(100);
+        // Hold LOW for > 3 s → maintenance mode (firmware update)
+        // Release within 3 s   → config mode (WiFi provisioning via USB/BLE)
+        Serial.println("\r\n[BOOT] devMode pin is LOW - waiting 3 s to detect intent...");
+        unsigned long holdStart = millis();
+        bool released = false;
+        while (millis() - holdStart < 3000) {
+            if (digitalRead(devModePin) == HIGH) { released = true; break; }
+            delay(50);
+        }
+
+        if (!released) {
+            Serial.println("[MAINTENANCE MODE] Holding LOW - staying awake for firmware upload.");
+            digitalWrite(statusLedPin, ledOn);
+            while (true) { delay(100); }
+        } else {
+            // Short press → config mode (web portal, blocks until reboot)
+            enterConfigMode();
         }
     }
 
-    wifiSetUp();
+    // Try NVS credentials first, fall back to env.h defaults
+    String nvsSsid, nvsPass;
+    if (loadWifiCredentials(nvsSsid, nvsPass)) {
+        Serial.printf("[WIFI] Using stored credentials for: %s\r\n", nvsSsid.c_str());
+        WiFi.begin(nvsSsid.c_str(), nvsPass.c_str());
+        int attempts = 0;
+        while (WiFi.status() != WL_CONNECTED && attempts < 20) { delay(500); attempts++; }
+        if (WiFi.status() != WL_CONNECTED) {
+            Serial.println("[WIFI] Stored credentials failed, falling back to env.h");
+            wifiSetUp();
+        } else {
+            Serial.printf("[WIFI] Connected! IP: %s\r\n", WiFi.localIP().toString().c_str());
+        }
+    } else {
+        wifiSetUp();
+    }
     
     if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) {
         syncNtpTime();

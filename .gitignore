@@ -10,3 +10,4 @@ include/env.h
 server/node_modules/
 server/data/
 server/.env
+node_modules/
