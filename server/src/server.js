@@ -27,6 +27,7 @@ const requireAuth   = require('./middleware/requireAuth');
 const authRouter    = require('./routes/auth');
 const sensorsRouter = require('./routes/sensors');
 const alertsRouter  = require('./routes/alerts');
+const adminRouter   = require('./routes/admin');
 
 // ---------------------------------------------------------------------------
 // First-run setup
@@ -85,9 +86,15 @@ app.get('/', requireAuth, (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
+// Admin panel — user management
+app.get('/admin', requireAuth, (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/admin.html'));
+});
+
 // Sensor + alert API routes (auth enforced per-route in each router)
 app.use('/api/sensors', sensorsRouter);
 app.use('/api/alerts',  alertsRouter);
+app.use('/api/admin',   adminRouter);
 
 // Static assets (dashboard.js, icons, etc.) — served without auth since
 // they contain no sensitive data. index.html is excluded via { index: false }.
