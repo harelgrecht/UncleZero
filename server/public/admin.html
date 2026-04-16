@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UncleZero — User Management</title>
+  <style>
+    :root {
+      --bg-base:    #0d1117;
+      --bg-card:    #161b22;
+      --bg-row:     #1c2128;
+      --border:     #30363d;
+      --border-sub: #21262d;
+      --text:       #e6edf3;
+      --text-sec:   #8b949e;
+      --text-muted: #484f58;
+      --green:      #3fb950;
+      --green-bg:   rgba(63,185,80,0.12);
+      --red:        #f85149;
+      --red-bg:     rgba(248,81,73,0.12);
+      --blue:       #388bfd;
+      --blue-hover: #58a6ff;
+      --radius:     8px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg-base);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 60px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .header-brand .logo {
+      width: 28px; height: 28px;
+      background: var(--red);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .header-brand .subtitle { color: var(--text-sec); font-weight: 400; font-size: 13px; }
+    .back-link {
+      font-size: 13px;
+      color: var(--blue);
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    /* ── Page Layout ── */
+    .page { max-width: 640px; margin: 0 auto; padding: 32px 24px; }
+
+    .page-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .page-sub {
+      font-size: 13px;
+      color: var(--text-sec);
+      margin-bottom: 28px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-sec);
+      margin-bottom: 16px;
+    }
+
+    /* ── Form ── */
+    .field { margin-bottom: 14px; }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-sec);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    input {
+      width: 100%;
+      padding: 9px 12px;
+      background: var(--bg-base);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(56,139,253,0.15);
+    }
+    input::placeholder { color: var(--text-muted); opacity: 0.6; }
+
+    .hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ── Banner ── */
+    .banner {
+      display: none;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      margin-bottom: 14px;
+      border: 1px solid transparent;
+    }
+    .banner.visible { display: block; }
+    .banner.success { background: var(--green-bg); color: var(--green); border-color: rgba(63,185,80,0.25); }
+    .banner.error   { background: var(--red-bg);   color: var(--red);   border-color: rgba(248,81,73,0.25); }
+
+    /* ── Button ── */
+    .btn {
+      padding: 9px 18px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover    { background: var(--blue-hover); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* ── Users Table ── */
+    .users-table { width: 100%; border-collapse: collapse; }
+    .users-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      padding: 0 0 10px;
+      border-bottom: 1px solid var(--border-sub);
+    }
+    .users-table td {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-sub);
+      font-size: 13px;
+    }
+    .users-table tr:last-child td { border-bottom: none; }
+    .user-avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    .created-at { color: var(--text-sec); font-size: 12px; }
+    .empty-users { color: var(--text-muted); font-size: 13px; padding: 16px 0; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="logo">&#x1F525;</div>
+      <div>
+        UncleZero
+        <span class="subtitle">Admin Panel</span>
+      </div>
+    </div>
+    <a class="back-link" href="/">Back to Dashboard</a>
+  </header>
+
+  <div class="page">
+    <div class="page-title">User Management</div>
+    <div class="page-sub">Create accounts for technicians or team members.</div>
+
+    <!-- Create User Form -->
+    <div class="card">
+      <div class="card-title">Create New User</div>
+
+      <div class="banner" id="banner"></div>
+
+      <form id="create-form">
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" type="text" placeholder="e.g. technician1" autocomplete="off" required />
+          <div class="hint">Minimum 3 characters.</div>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" placeholder="••••••••" required />
+          <div class="hint">Minimum 8 characters.</div>
+        </div>
+        <div class="field">
+          <label for="confirm">Confirm Password</label>
+          <input id="confirm" type="password" placeholder="••••••••" required />
+        </div>
+        <button type="submit" class="btn btn-primary" id="submit-btn">Create User</button>
+      </form>
+    </div>
+
+    <!-- Existing Users -->
+    <div class="card">
+      <div class="card-title">Existing Users</div>
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody id="users-body">
+          <tr><td colspan="2" class="empty-users">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

@@ -5,8 +5,10 @@
 // The schema is created on first run; no migrations needed for new installs.
 //
 // Tables:
-//   sensors  — Current state snapshot of every known sensor
-//   alerts   — Immutable log of every status-change event
+//   sensors   — Current state snapshot of every known sensor
+//   alerts    — Immutable log of every status-change event
+//   users     — Dashboard user accounts (hashed passwords)
+//   api_keys  — ESP32 device API keys (SHA-256 hashed)
 // =============================================================================
 
 const path     = require('path');
@@ -48,6 +50,22 @@ db.exec(`
     sensor_num  INTEGER NOT NULL,
     event       TEXT    NOT NULL,     -- "TANK_EMPTY" | "TANK_RESTORED"
     timestamp   INTEGER NOT NULL      -- Unix timestamp in milliseconds
+  );
+
+  -- Dashboard user accounts
+  CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT    NOT NULL UNIQUE,
+    password_hash TEXT    NOT NULL,   -- bcrypt hash
+    created_at    INTEGER NOT NULL    -- Unix timestamp in milliseconds
+  );
+
+  -- ESP32 device API keys (one row per registered device)
+  CREATE TABLE IF NOT EXISTS api_keys (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    label      TEXT    NOT NULL,      -- human-readable name, e.g. "kitchen-esp32"
+    key_hash   TEXT    NOT NULL,      -- SHA-256 hex digest of the raw key
+    created_at INTEGER NOT NULL       -- Unix timestamp in milliseconds
   );
 
   -- Speed up the dashboard's "latest alerts" query

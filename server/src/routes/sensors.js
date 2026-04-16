@@ -15,20 +15,22 @@
 //   "uptime": 3721
 // }
 //
-// Security note:
-//   For production deployments add an API key check before processReport().
-//   Example: require('../../middleware/apiKeyAuth')(req, res, next)
+// Authentication:
+//   POST /report → requires X-Api-Key header (or JWT cookie for browser testing)
+//   GET  /       → requires JWT cookie (dashboard users only)
 // =============================================================================
 
-const { Router }     = require('express');
-const sensorService  = require('../services/sensorService');
+const { Router }      = require('express');
+const sensorService   = require('../services/sensorService');
+const requireAuth     = require('../middleware/requireAuth');
+const requireApiKey   = require('../middleware/requireApiKey');
 
 const router = Router();
 
 // ---------------------------------------------------------------------------
-// POST /api/sensors/report
+// POST /api/sensors/report  —  Protected by API key (ESP32 devices)
 // ---------------------------------------------------------------------------
-router.post('/report', (req, res) => {
+router.post('/report', requireApiKey, (req, res) => {
   const { deviceId, sensors, rssi, uptime } = req.body;
 
   if (!deviceId || typeof deviceId !== 'string') {
@@ -48,9 +50,9 @@ router.post('/report', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/sensors
+// GET /api/sensors  —  Protected by JWT (dashboard users)
 // ---------------------------------------------------------------------------
-router.get('/', (_req, res) => {
+router.get('/', requireAuth, (_req, res) => {
   res.json(sensorService.getAllSensors());
 });
 
