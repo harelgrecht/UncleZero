@@ -9,6 +9,9 @@
 //   • Static       — Serves the dashboard and login page from /public
 // =============================================================================
 
+// Load .env before anything else so every module sees the environment variables
+require('dotenv').config();
+
 const http         = require('http');
 const path         = require('path');
 const express      = require('express');
