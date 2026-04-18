@@ -374,15 +374,15 @@ static void handleCaptive() {
 // Shared helpers
 // ==========================================
 
-static void startAP() {
+static void startAP(int channel) {
     WiFi.mode(WIFI_AP_STA);
     delay(200);
-    bool ok = WiFi.softAP(CONFIG_AP_SSID, nullptr, 1, false, 4);
+    bool ok = WiFi.softAP(CONFIG_AP_SSID, nullptr, channel, false, 4);
     delay(500);
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(53, "*", WiFi.softAPIP());
-    Serial.printf("[AP] '%s'  IP: %s  (%s)\r\n", CONFIG_AP_SSID,
-                  WiFi.softAPIP().toString().c_str(),
+    Serial.printf("[AP] '%s'  ch%d  IP: %s  (%s)\r\n", CONFIG_AP_SSID,
+                  channel, WiFi.softAPIP().toString().c_str(),
                   ok ? "OK" : "FAILED");
 }
 
@@ -418,7 +418,7 @@ void enterConfigMode() {
     }
     digitalWrite(statusLedPin, ledOn);
 
-    startAP();
+    startAP(1);  // config mode: channel 1 is fine, no STA to conflict
 
     String storedSsid, storedPass;
     if (loadWifiCredentials(storedSsid, storedPass)) {
@@ -466,12 +466,12 @@ void enterConfigMode() {
 // startAlwaysOnServer — non-blocking
 // ==========================================
 
-void startAlwaysOnServer() {
+void startAlwaysOnServer(int apChannel) {
     Serial.println("[ALWAYS-ON] Starting persistent web portal...");
 
     // AP stays running so the device is always reachable for
     // reconfiguration even if the home WiFi SSID/password changes.
-    startAP();
+    startAP(apChannel);
     setupWebServer();
 
     if (MDNS.begin(CONFIG_MDNS_HOST)) {

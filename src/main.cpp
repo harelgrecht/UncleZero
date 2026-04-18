@@ -122,13 +122,28 @@ void setup() {
 
     // ── Always-on mode ────────────────────────────────────────────────────────
     // Start the AP *first* (WIFI_AP_STA mode), then connect to home WiFi as STA.
-    // This avoids a mode-switch after WiFi is already in WIFI_STA, which can
-    // silently prevent softAP from becoming visible.
+    // Critical: AP and STA must share the same channel on ESP32-C3.
+    // We scan for the home router channel first, then start the AP on that channel.
     if (isWebAlwaysOn()) {
-        startAlwaysOnServer();   // brings up AP + web server in WIFI_AP_STA mode
+        // Quick scan (STA-only mode) to find the home router's channel
+        String _tmpSsid, _tmpPass;
+        loadWifiCredentials(_tmpSsid, _tmpPass);
+        const char* scanTarget = _tmpSsid.length() > 0 ? _tmpSsid.c_str() : wifiSsid;
+        WiFi.mode(WIFI_STA);
+        int n = WiFi.scanNetworks(false, false, false, 300);
+        int apChannel = 6;  // safe fallback
+        for (int i = 0; i < n; i++) {
+            if (WiFi.SSID(i) == scanTarget) {
+                apChannel = WiFi.channel(i);
+                break;
+            }
+        }
+        WiFi.scanDelete();
+        Serial.printf("[SCAN] %s → ch%d\r\n", scanTarget, apChannel);
 
-        // Let AP stabilise for 3 s before the STA scan starts.
-        // STA scanning temporarily suppresses AP beacon frames.
+        startAlwaysOnServer(apChannel);  // AP starts on same channel as router
+
+        // Let AP stabilise for 3 s before the STA connect starts.
         for (int i = 0; i < 600; i++) { handleAlwaysOnClients(); delay(5); }
 
         // Try connecting to home WiFi (keeps web server alive during attempt)
@@ -137,11 +152,8 @@ void setup() {
             loadWifiCredentials(nvsSsid, nvsPass);
             const char* ssid = nvsSsid.length() > 0 ? nvsSsid.c_str() : wifiSsid;
             const char* pass = nvsPass.length() > 0  ? nvsPass.c_str()  : wifiPassword;
-            Serial.printf("[WIFI] Connecting to: %s (mode=%d)\r\n", ssid, WiFi.getMode());
-            // Re-assert AP_STA before begin — WiFi.begin() can silently switch to STA-only
-            WiFi.mode(WIFI_AP_STA);
+            Serial.printf("[WIFI] Connecting to: %s\r\n", ssid);
             WiFi.begin(ssid, pass);
-            Serial.printf("[WIFI] Mode after begin: %d\r\n", WiFi.getMode());
             int att = 0;
             while (WiFi.status() != WL_CONNECTED && att < 40) {  // 20 s
                 handleAlwaysOnClients(); delay(500); att++;
