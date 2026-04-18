@@ -121,51 +121,30 @@ void setup() {
     }
 
     // ── Always-on mode ────────────────────────────────────────────────────────
-    // Start the AP *first* (WIFI_AP_STA mode), then connect to home WiFi as STA.
-    // Critical: AP and STA must share the same channel on ESP32-C3.
-    // We scan for the home router channel first, then start the AP on that channel.
+    // Key insight: when STA is already connected, ESP32 forces the softAP onto
+    // the same channel automatically — so connect WiFi FIRST, then start AP.
+    // This is what worked originally and avoids all channel-conflict issues.
     if (isWebAlwaysOn()) {
-        // Quick scan (STA-only mode) to find the home router's channel
-        String _tmpSsid, _tmpPass;
-        loadWifiCredentials(_tmpSsid, _tmpPass);
-        const char* scanTarget = _tmpSsid.length() > 0 ? _tmpSsid.c_str() : wifiSsid;
-        WiFi.mode(WIFI_STA);
-        int n = WiFi.scanNetworks(false, false, false, 300);
-        int apChannel = 6;  // safe fallback
-        for (int i = 0; i < n; i++) {
-            if (WiFi.SSID(i) == scanTarget) {
-                apChannel = WiFi.channel(i);
-                break;
-            }
-        }
-        WiFi.scanDelete();
-        Serial.printf("[SCAN] %s → ch%d\r\n", scanTarget, apChannel);
-
-        startAlwaysOnServer(apChannel);  // AP starts on same channel as router
-
-        // Let AP stabilise for 3 s before the STA connect starts.
-        for (int i = 0; i < 600; i++) { handleAlwaysOnClients(); delay(5); }
-
-        // Try connecting to home WiFi (keeps web server alive during attempt)
+        // 1. Connect home WiFi as STA (normal STA mode)
         String nvsSsid, nvsPass;
-        auto tryConnectWifi = [&]() {
-            loadWifiCredentials(nvsSsid, nvsPass);
-            const char* ssid = nvsSsid.length() > 0 ? nvsSsid.c_str() : wifiSsid;
-            const char* pass = nvsPass.length() > 0  ? nvsPass.c_str()  : wifiPassword;
-            Serial.printf("[WIFI] Connecting to: %s\r\n", ssid);
-            WiFi.begin(ssid, pass);
-            int att = 0;
-            while (WiFi.status() != WL_CONNECTED && att < 40) {  // 20 s
-                handleAlwaysOnClients(); delay(500); att++;
-            }
-            if (WiFi.status() == WL_CONNECTED) {
-                Serial.printf("[WIFI] Connected! IP: %s\r\n", WiFi.localIP().toString().c_str());
-                if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) syncNtpTime();
-            } else {
-                Serial.printf("[WIFI] Failed (status=%d) - AP still at 192.168.4.1\r\n", WiFi.status());
-            }
-        };
-        tryConnectWifi();
+        bool hasStored = loadWifiCredentials(nvsSsid, nvsPass);
+        const char* staSSID = hasStored ? nvsSsid.c_str() : wifiSsid;
+        const char* staPass = hasStored ? nvsPass.c_str() : wifiPassword;
+        Serial.printf("[WIFI] Connecting to: %s\r\n", staSSID);
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(staSSID, staPass);
+        int att = 0;
+        while (WiFi.status() != WL_CONNECTED && att < 40) { delay(500); att++; }
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.printf("[WIFI] Connected! IP: %s  ch%d\r\n",
+                          WiFi.localIP().toString().c_str(), WiFi.channel());
+            if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) syncNtpTime();
+        } else {
+            Serial.printf("[WIFI] Home WiFi unavailable (status=%d)\r\n", WiFi.status());
+        }
+
+        // 2. Start AP — ESP32 auto-matches AP channel to the connected STA channel
+        startAlwaysOnServer(1);  // channel arg is overridden by STA channel when connected
 
         verifyInitialTankStatus();
         unsigned long lastReport  = 0;
@@ -176,7 +155,14 @@ void setup() {
             // Retry WiFi every 60 s when disconnected
             if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTry > 60000) {
                 lastWifiTry = millis();
-                tryConnectWifi();
+                Serial.printf("[WIFI] Retrying: %s\r\n", staSSID);
+                WiFi.begin(staSSID, staPass);
+                int r = 0;
+                while (WiFi.status() != WL_CONNECTED && r < 20) {
+                    handleAlwaysOnClients(); delay(500); r++;
+                }
+                if (WiFi.status() == WL_CONNECTED)
+                    Serial.printf("[WIFI] Reconnected! IP: %s\r\n", WiFi.localIP().toString().c_str());
             }
 
             if (millis() - lastReport > 30000) {
