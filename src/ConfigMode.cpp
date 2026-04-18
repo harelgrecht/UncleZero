@@ -375,12 +375,10 @@ static void handleCaptive() {
 // ==========================================
 
 static void startAP() {
-    WiFi.persistent(false);   // don't write credentials to flash
-    WiFi.setSleep(false);     // keep radio awake — improves AP+STA stability
     WiFi.mode(WIFI_AP_STA);
-    delay(200);               // let mode switch settle
+    delay(200);
     bool ok = WiFi.softAP(CONFIG_AP_SSID, nullptr, 1, false, 4);
-    delay(500);               // give AP time to start beaconing before STA scan
+    delay(500);
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(53, "*", WiFi.softAPIP());
     Serial.printf("[AP] '%s'  IP: %s  (%s)\r\n", CONFIG_AP_SSID,

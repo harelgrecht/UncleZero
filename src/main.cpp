@@ -138,7 +138,6 @@ void setup() {
             const char* ssid = nvsSsid.length() > 0 ? nvsSsid.c_str() : wifiSsid;
             const char* pass = nvsPass.length() > 0  ? nvsPass.c_str()  : wifiPassword;
             Serial.printf("[WIFI] Connecting to: %s\r\n", ssid);
-            WiFi.disconnect(false);
             WiFi.begin(ssid, pass);
             int att = 0;
             while (WiFi.status() != WL_CONNECTED && att < 20) {
@@ -146,11 +145,8 @@ void setup() {
             }
             if (WiFi.status() == WL_CONNECTED) {
                 Serial.printf("[WIFI] Connected! IP: %s\r\n", WiFi.localIP().toString().c_str());
-                WiFi.setAutoReconnect(true);
                 if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) syncNtpTime();
             } else {
-                WiFi.disconnect(false);
-                WiFi.setAutoReconnect(false); // stop radio scanning — keeps AP beacons stable
                 Serial.println("[WIFI] Home WiFi unavailable - AP still at 192.168.4.1");
             }
         };
