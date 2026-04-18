@@ -137,17 +137,20 @@ void setup() {
             loadWifiCredentials(nvsSsid, nvsPass);
             const char* ssid = nvsSsid.length() > 0 ? nvsSsid.c_str() : wifiSsid;
             const char* pass = nvsPass.length() > 0  ? nvsPass.c_str()  : wifiPassword;
-            Serial.printf("[WIFI] Connecting to: %s\r\n", ssid);
+            Serial.printf("[WIFI] Connecting to: %s (mode=%d)\r\n", ssid, WiFi.getMode());
+            // Re-assert AP_STA before begin — WiFi.begin() can silently switch to STA-only
+            WiFi.mode(WIFI_AP_STA);
             WiFi.begin(ssid, pass);
+            Serial.printf("[WIFI] Mode after begin: %d\r\n", WiFi.getMode());
             int att = 0;
-            while (WiFi.status() != WL_CONNECTED && att < 20) {
+            while (WiFi.status() != WL_CONNECTED && att < 40) {  // 20 s
                 handleAlwaysOnClients(); delay(500); att++;
             }
             if (WiFi.status() == WL_CONNECTED) {
                 Serial.printf("[WIFI] Connected! IP: %s\r\n", WiFi.localIP().toString().c_str());
                 if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) syncNtpTime();
             } else {
-                Serial.println("[WIFI] Home WiFi unavailable - AP still at 192.168.4.1");
+                Serial.printf("[WIFI] Failed (status=%d) - AP still at 192.168.4.1\r\n", WiFi.status());
             }
         };
         tryConnectWifi();
