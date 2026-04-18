@@ -46,6 +46,7 @@ void reportTankStatusToServer(const String& tankName, const String& status) {
     HTTPClient http;
     http.begin(serverUrl);
     http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Api-Key", "H4v4HSc8qF-Vt7UaL6pqlF81IJOeFcmM");
     
     int httpCode = http.POST(payload);
     
@@ -125,6 +126,10 @@ void setup() {
     // silently prevent softAP from becoming visible.
     if (isWebAlwaysOn()) {
         startAlwaysOnServer();   // brings up AP + web server in WIFI_AP_STA mode
+
+        // Wait 3 s for the AP to stabilise and become visible to phones
+        // before the STA scan starts (STA scanning suppresses AP beacons)
+        for (int i = 0; i < 600; i++) { handleAlwaysOnClients(); delay(5); }
 
         // Connect home WiFi as STA while AP is already running
         String nvsSsid, nvsPass;

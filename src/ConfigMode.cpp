@@ -375,13 +375,17 @@ static void handleCaptive() {
 // ==========================================
 
 static void startAP() {
+    WiFi.persistent(false);        // don't write credentials to flash
+    WiFi.setAutoReconnect(false);  // stop STA from scanning when it can't connect
     WiFi.mode(WIFI_AP_STA);
-    WiFi.softAP(CONFIG_AP_SSID, nullptr, 1, false, 4);
-    delay(200);
+    delay(200);                    // let mode switch settle
+    bool ok = WiFi.softAP(CONFIG_AP_SSID, nullptr, 6, false, 4);
+    delay(500);                    // give AP time to start beaconing
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(53, "*", WiFi.softAPIP());
-    Serial.printf("[AP] '%s'  IP: %s\r\n", CONFIG_AP_SSID,
-                  WiFi.softAPIP().toString().c_str());
+    Serial.printf("[AP] '%s'  IP: %s  (%s)\r\n", CONFIG_AP_SSID,
+                  WiFi.softAPIP().toString().c_str(),
+                  ok ? "OK" : "FAILED");
 }
 
 static void setupWebServer() {
