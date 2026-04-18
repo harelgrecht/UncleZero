@@ -127,36 +127,47 @@ void setup() {
     if (isWebAlwaysOn()) {
         startAlwaysOnServer();   // brings up AP + web server in WIFI_AP_STA mode
 
-        // Wait 3 s for the AP to stabilise and become visible to phones
-        // before the STA scan starts (STA scanning suppresses AP beacons)
+        // Let AP stabilise for 3 s before the STA scan starts.
+        // STA scanning temporarily suppresses AP beacon frames.
         for (int i = 0; i < 600; i++) { handleAlwaysOnClients(); delay(5); }
 
-        // Connect home WiFi as STA while AP is already running
+        // Try connecting to home WiFi (keeps web server alive during attempt)
         String nvsSsid, nvsPass;
-        bool hasStored = loadWifiCredentials(nvsSsid, nvsPass);
-        const char* ssid = hasStored ? nvsSsid.c_str() : wifiSsid;
-        const char* pass = hasStored ? nvsPass.c_str() : wifiPassword;
-        Serial.printf("[WIFI] Connecting to: %s\r\n", ssid);
-        WiFi.begin(ssid, pass);
-
-        // Wait up to 10 s, keep web server alive during connect
-        int attempts = 0;
-        while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-            handleAlwaysOnClients();
-            delay(500);
-            attempts++;
-        }
-        if (WiFi.status() == WL_CONNECTED) {
-            Serial.printf("[WIFI] Connected! IP: %s\r\n", WiFi.localIP().toString().c_str());
-            if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) syncNtpTime();
-        } else {
-            Serial.println("[WIFI] Home WiFi unavailable - AP still reachable at 192.168.4.1");
-        }
+        auto tryConnectWifi = [&]() {
+            loadWifiCredentials(nvsSsid, nvsPass);
+            const char* ssid = nvsSsid.length() > 0 ? nvsSsid.c_str() : wifiSsid;
+            const char* pass = nvsPass.length() > 0  ? nvsPass.c_str()  : wifiPassword;
+            Serial.printf("[WIFI] Connecting to: %s\r\n", ssid);
+            WiFi.disconnect(false);
+            WiFi.begin(ssid, pass);
+            int att = 0;
+            while (WiFi.status() != WL_CONNECTED && att < 20) {
+                handleAlwaysOnClients(); delay(500); att++;
+            }
+            if (WiFi.status() == WL_CONNECTED) {
+                Serial.printf("[WIFI] Connected! IP: %s\r\n", WiFi.localIP().toString().c_str());
+                WiFi.setAutoReconnect(true);
+                if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) syncNtpTime();
+            } else {
+                WiFi.disconnect(false);
+                WiFi.setAutoReconnect(false); // stop radio scanning — keeps AP beacons stable
+                Serial.println("[WIFI] Home WiFi unavailable - AP still at 192.168.4.1");
+            }
+        };
+        tryConnectWifi();
 
         verifyInitialTankStatus();
-        unsigned long lastReport = 0;
+        unsigned long lastReport  = 0;
+        unsigned long lastWifiTry = millis();
         while (true) {
             handleAlwaysOnClients();
+
+            // Retry WiFi every 60 s when disconnected
+            if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTry > 60000) {
+                lastWifiTry = millis();
+                tryConnectWifi();
+            }
+
             if (millis() - lastReport > 30000) {
                 lastReport = millis();
                 verifyInitialTankStatus();
