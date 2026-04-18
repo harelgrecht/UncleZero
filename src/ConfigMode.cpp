@@ -48,8 +48,8 @@ header p{font-size:12px;opacity:.75}
 .net-name{font-size:14px;color:#263238}
 .net-rssi{font-size:12px;color:#90A4AE}
 label{display:block;font-size:13px;font-weight:600;color:#546E7A;margin:13px 0 5px}
-input{width:100%;padding:12px 14px;border:1.5px solid #CFD8DC;border-radius:10px;font-size:15px;color:#263238;background:#FAFAFA;outline:none;transition:border .2s}
-input:focus{border-color:#1565C0;background:#fff}
+input[type=text],input[type=password]{width:100%;padding:12px 14px;border:1.5px solid #CFD8DC;border-radius:10px;font-size:15px;color:#263238;background:#FAFAFA;outline:none;transition:border .2s}
+input[type=text]:focus,input[type=password]:focus{border-color:#1565C0;background:#fff}
 .pw{position:relative}
 .pw input{padding-right:64px}
 .eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:#1565C0;font-size:13px;font-weight:600;cursor:pointer;padding:4px}
@@ -65,31 +65,35 @@ input:focus{border-color:#1565C0;background:#fff}
 .ok{background:#E8F5E9;color:#2E7D32}
 .err{background:#FFEBEE;color:#C62828}
 .info{background:#E3F2FD;color:#1565C0}
-.spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:s .6s linear infinite;vertical-align:middle;margin-right:6px}
-@keyframes s{to{transform:rotate(360deg)}}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sp .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
 .hidden{display:none}
 .chip{display:inline-block;background:#E3F2FD;color:#1565C0;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;margin-left:8px}
+.toggle-row{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:6px 0}
+.tl{font-size:14px;font-weight:600;color:#263238}
+.td{font-size:12px;color:#78909C;margin-top:4px;line-height:1.5}
+.switch{position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0;margin-top:2px}
+.switch input{opacity:0;width:0;height:0}
+.sl{position:absolute;cursor:pointer;inset:0;background:#CFD8DC;border-radius:28px;transition:.3s}
+.sl:before{position:absolute;content:'';height:22px;width:22px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+input:checked+.sl{background:#1565C0}
+input:checked+.sl:before{transform:translateX(22px)}
 </style>
 </head>
 <body>
 <div class="wrap">
+<header><h1>DodZero Setup</h1><p>WiFi Configuration Portal</p></header>
 
-<header>
-  <h1>DodZero Setup</h1>
-  <p>WiFi Configuration Portal</p>
-</header>
-
-<!-- Status card -->
 <div class="card">
   <div class="card-title">Connection Status</div>
   <div class="row">
     <div class="dot dot-off" id="dot"></div>
-    <span class="st" id="st">Loading…</span>
+    <span class="st" id="st">Loading...</span>
     <span class="chip hidden" id="chip"></span>
   </div>
   <div class="sub" id="ssid-sub"></div>
   <div class="sub" id="ip-sub"></div>
-  <div class="bars" id="bars">
+  <div class="bars">
     <div class="bar" id="b1" style="height:6px"></div>
     <div class="bar" id="b2" style="height:12px"></div>
     <div class="bar" id="b3" style="height:19px"></div>
@@ -98,7 +102,6 @@ input:focus{border-color:#1565C0;background:#fff}
   <div class="sub" id="rssi-sub" style="margin-top:5px"></div>
 </div>
 
-<!-- Config card -->
 <div class="card">
   <div class="card-title">WiFi Configuration</div>
   <button class="btn outline" id="scan-btn" onclick="doScan()">Scan Nearby Networks</button>
@@ -114,21 +117,31 @@ input:focus{border-color:#1565C0;background:#fff}
   <div id="save-result"></div>
 </div>
 
-<!-- Device card -->
 <div class="card">
-  <div class="card-title">Device</div>
-  <div class="sub">Access this page from your home network at:</div>
-  <div class="sub" id="local-url" style="font-weight:600;color:#1565C0;margin-top:4px">http://dodzero.local</div>
-  <button class="btn danger" id="restart-btn" onclick="doRestart()">Restart Device</button>
+  <div class="card-title">Device Settings</div>
+  <div class="toggle-row">
+    <div>
+      <div class="tl">Always-on Web Portal</div>
+      <div class="td">Keep this page accessible at <strong>http://dodzero.local</strong> without pressing the config button. The <strong>DodZero-Setup</strong> AP will stay active so you can always reconfigure WiFi. Takes effect after next restart.</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="web-always-on" onchange="saveSetting()">
+      <span class="sl"></span>
+    </label>
+  </div>
+  <div id="setting-result"></div>
 </div>
 
-</div><!-- /wrap -->
+<div class="card">
+  <div class="card-title">Device</div>
+  <div class="sub">From your home network: <strong style="color:#1565C0">http://dodzero.local</strong></div>
+  <div class="sub" style="margin-top:6px">AP always available: <strong style="color:#1565C0">http://192.168.4.1</strong> &nbsp;(DodZero-Setup)</div>
+  <button class="btn danger" id="restart-btn" onclick="doRestart()">Restart Device</button>
+</div>
+</div>
 
 <script>
-var rssiTimer;
-
 function qi(id){return document.getElementById(id);}
-
 function rssiInfo(r){
   if(r==null)return{bars:0,lbl:'',col:'#E0E0E0'};
   if(r>=-50)return{bars:4,lbl:'Excellent',col:'#2E7D32'};
@@ -137,111 +150,89 @@ function rssiInfo(r){
   if(r>=-85)return{bars:1,lbl:'Poor',col:'#E65100'};
   return{bars:0,lbl:'Very Poor',col:'#B71C1C'};
 }
-
 function setBars(rssi){
   var i=rssiInfo(rssi);
-  ['b1','b2','b3','b4'].forEach(function(id,idx){
-    var el=qi(id);
-    el.style.background=idx<i.bars?i.col:'#E0E0E0';
-  });
-  qi('rssi-sub').textContent=rssi!=null?rssi+' dBm · '+i.lbl:'';
+  ['b1','b2','b3','b4'].forEach(function(id,idx){qi(id).style.background=idx<i.bars?i.col:'#E0E0E0';});
+  qi('rssi-sub').textContent=rssi!=null?rssi+' dBm - '+i.lbl:'';
 }
-
 function loadStatus(){
   fetch('/api/status').then(function(r){return r.json();}).then(function(d){
     var on=d.wifi_connected;
     qi('dot').className='dot '+(on?'dot-on':'dot-off');
     qi('st').textContent=on?'Connected':'Not Connected';
     var chip=qi('chip');
-    if(on){chip.textContent=d.ssid;chip.classList.remove('hidden');}
-    else{chip.classList.add('hidden');}
+    if(on){chip.textContent=d.ssid;chip.classList.remove('hidden');}else chip.classList.add('hidden');
     qi('ssid-sub').textContent=on?'Network: '+d.ssid:'No WiFi connection';
     qi('ip-sub').textContent=on?'IP: '+d.ip:'AP: '+d.ap_ip;
     setBars(on?d.rssi:null);
-    if(d.local_url)qi('local-url').textContent=d.local_url;
   }).catch(function(){});
 }
-
+function loadSettings(){
+  fetch('/api/settings').then(function(r){return r.json();}).then(function(d){
+    qi('web-always-on').checked=!!d.web_always_on;
+  }).catch(function(){});
+}
+function saveSetting(){
+  var val=qi('web-always-on').checked;
+  fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'web_always_on='+(val?'1':'0')})
+  .then(function(r){return r.json();}).then(function(){
+    var res=qi('setting-result');
+    res.innerHTML='<div class="alert ok" style="margin-top:10px">'
+      +(val?'Always-on portal <strong>enabled</strong>. Restart to activate.'
+           :'Always-on portal <strong>disabled</strong>. Device will deep-sleep after restart.')
+      +'</div>';
+    setTimeout(function(){res.innerHTML='';},5000);
+  });
+}
 function doScan(){
   var btn=qi('scan-btn');
-  btn.disabled=true;
-  btn.innerHTML='<span class="spin"></span>Scanning…';
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>Scanning...';
   fetch('/api/scan').then(function(r){return r.json();}).then(function(d){
-    var list=qi('net-list');
-    list.classList.remove('hidden');
+    var list=qi('net-list');list.classList.remove('hidden');
     list.innerHTML=d.networks.map(function(n){
       return '<div class="net" onclick="pickNet(this,\''+esc(n.ssid)+'\')">'
-        +'<span class="net-name">'+(n.secure?'🔒 ':'')+esc(n.ssid)+'</span>'
-        +'<span class="net-rssi">'+n.rssi+' dBm</span>'
-        +'</div>';
-    }).join('');
-    if(!d.networks.length)list.innerHTML='<div class="net"><span class="net-name" style="color:#90A4AE">No networks found</span></div>';
-  }).catch(function(){
-    showResult('scan-result','err','Scan failed — try again.');
-  }).finally(function(){
-    btn.disabled=false;
-    btn.textContent='Scan Nearby Networks';
-  });
+        +'<span class="net-name">'+(n.secure?'&#128274; ':'')+esc(n.ssid)+'</span>'
+        +'<span class="net-rssi">'+n.rssi+' dBm</span></div>';
+    }).join('')||'<div class="net"><span class="net-name" style="color:#90A4AE">No networks found</span></div>';
+  }).catch(function(){}).finally(function(){btn.disabled=false;btn.textContent='Scan Nearby Networks';});
 }
-
 function pickNet(el,ssid){
   document.querySelectorAll('.net').forEach(function(e){e.classList.remove('sel');});
-  el.classList.add('sel');
-  qi('ssid').value=ssid;
-  qi('pw').focus();
+  el.classList.add('sel');qi('ssid').value=ssid;qi('pw').focus();
 }
-
 function doSave(){
-  var ssid=qi('ssid').value.trim();
-  var pw=qi('pw').value;
+  var ssid=qi('ssid').value.trim(),pw=qi('pw').value;
   if(!ssid){alert('Please enter or select a network name.');return;}
-  var btn=qi('save-btn');
-  btn.disabled=true;
-  btn.innerHTML='<span class="spin"></span>Connecting…';
-  qi('save-result').innerHTML='<div class="alert info">Connecting — this may take up to 15 seconds…</div>';
-  fetch('/api/config',{
-    method:'POST',
-    headers:{'Content-Type':'application/x-www-form-urlencoded'},
-    body:'ssid='+encodeURIComponent(ssid)+'&password='+encodeURIComponent(pw)
-  }).then(function(r){return r.json();}).then(function(d){
+  var btn=qi('save-btn'),res=qi('save-result');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>Connecting...';
+  res.innerHTML='<div class="alert info">Connecting - this may take up to 15 seconds...</div>';
+  fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'ssid='+encodeURIComponent(ssid)+'&password='+encodeURIComponent(pw)})
+  .then(function(r){return r.json();}).then(function(d){
     if(d.status==='ok'){
-      qi('save-result').innerHTML='<div class="alert ok">Connected! IP: <strong>'+d.ip+'</strong><br>'
-        +'You can now reach this page at <a href="http://dodzero.local" style="color:#2E7D32">http://dodzero.local</a> from your home network.</div>';
+      res.innerHTML='<div class="alert ok">Connected! IP: <strong>'+d.ip+'</strong><br>Reach this page at <a href="http://dodzero.local" style="color:#2E7D32">http://dodzero.local</a></div>';
       loadStatus();
-    } else {
-      qi('save-result').innerHTML='<div class="alert err">Failed: '+(d.msg||'Check your password and try again.')+'</div>';
+    }else{
+      res.innerHTML='<div class="alert err">Failed: '+(d.msg||'Check your password and try again.')+'</div>';
     }
   }).catch(function(){
-    qi('save-result').innerHTML='<div class="alert info">Device may be restarting after a successful save. Try connecting to your home WiFi and opening <strong>http://dodzero.local</strong></div>';
-  }).finally(function(){
-    btn.disabled=false;
-    btn.textContent='Save & Connect';
-  });
+    res.innerHTML='<div class="alert info">Device may be restarting. Try <strong>http://dodzero.local</strong> from your home network.</div>';
+  }).finally(function(){btn.disabled=false;btn.textContent='Save & Connect';});
 }
-
 function togglePw(){
-  var inp=qi('pw'),btn=event.target;
-  inp.type=inp.type==='password'?'text':'password';
-  btn.textContent=inp.type==='password'?'Show':'Hide';
+  var inp=qi('pw');inp.type=inp.type==='password'?'text':'password';
+  event.target.textContent=inp.type==='password'?'Show':'Hide';
 }
-
 function doRestart(){
   if(!confirm('Restart the DodZero device?'))return;
-  var btn=qi('restart-btn');
-  btn.disabled=true;
-  btn.innerHTML='<span class="spin"></span>Restarting…';
+  var btn=qi('restart-btn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>Restarting...';
   fetch('/api/restart',{method:'POST'}).finally(function(){
-    setTimeout(function(){
-      btn.disabled=false;
-      btn.textContent='Restart Device';
-    },5000);
+    setTimeout(function(){btn.disabled=false;btn.textContent='Restart Device';},6000);
   });
 }
-
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
-
-loadStatus();
-rssiTimer=setInterval(loadStatus,5000);
+loadStatus();loadSettings();setInterval(loadStatus,5000);
 </script>
 </body>
 </html>
@@ -252,7 +243,8 @@ rssiTimer=setInterval(loadStatus,5000);
 // ==========================================
 
 bool loadWifiCredentials(String& ssid, String& password) {
-    prefs.begin(NVS_NAMESPACE, true);
+    // Open read-write (false) so NVS namespace is created on first boot
+    prefs.begin(NVS_NAMESPACE, false);
     ssid     = prefs.getString(NVS_KEY_SSID, "");
     password = prefs.getString(NVS_KEY_PASS, "");
     prefs.end();
@@ -264,6 +256,14 @@ static void saveWifiCredentials(const String& ssid, const String& password) {
     prefs.putString(NVS_KEY_SSID, ssid.c_str());
     prefs.putString(NVS_KEY_PASS, password.c_str());
     prefs.end();
+}
+
+bool isWebAlwaysOn() {
+    // Open read-write (false) so NVS namespace is created on first boot
+    prefs.begin(NVS_NAMESPACE, false);
+    bool val = prefs.getBool(NVS_KEY_WEB_ALWAYS_ON, true);  // default ON
+    prefs.end();
+    return val;
 }
 
 // ==========================================
@@ -278,100 +278,84 @@ static void handleRoot() {
 static void handleStatus() {
     lastActivityMs = millis();
     bool connected = (WiFi.status() == WL_CONNECTED);
-
     JsonDocument doc;
     doc["wifi_connected"] = connected;
     doc["ap_ip"]          = WiFi.softAPIP().toString();
-    doc["local_url"]      = "http://" + String(CONFIG_MDNS_HOST) + ".local";
-
     if (connected) {
         doc["ssid"] = WiFi.SSID();
         doc["rssi"] = WiFi.RSSI();
         doc["ip"]   = WiFi.localIP().toString();
     }
-
-    String out;
-    serializeJson(doc, out);
+    String out; serializeJson(doc, out);
     server.sendHeader("Cache-Control", "no-cache");
     server.send(200, "application/json", out);
 }
 
 static void handleScan() {
     lastActivityMs = millis();
-
-    // Run synchronous scan (hidden networks included)
     int n = WiFi.scanNetworks(false, true);
-
     JsonDocument doc;
     JsonArray nets = doc["networks"].to<JsonArray>();
-
     if (n > 0) {
-        // Sort by RSSI descending (simple bubble sort — max 20 items)
-        for (int i = 0; i < min(n, 20) - 1; i++) {
-            for (int j = 0; j < min(n, 20) - 1 - i; j++) {
-                if (WiFi.RSSI(j) < WiFi.RSSI(j + 1)) {
-                    // swap in scan results — not directly possible, so build array first
-                }
-            }
-        }
-        // Build result (WiFi.scanNetworks already returns sorted by RSSI on ESP32)
         for (int i = 0; i < min(n, 20); i++) {
-            if (WiFi.SSID(i).length() == 0) continue; // skip hidden
+            if (WiFi.SSID(i).length() == 0) continue;
             JsonObject net = nets.add<JsonObject>();
             net["ssid"]   = WiFi.SSID(i);
             net["rssi"]   = WiFi.RSSI(i);
             net["secure"] = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
         }
     }
-
     WiFi.scanDelete();
-
-    String out;
-    serializeJson(doc, out);
+    String out; serializeJson(doc, out);
     server.sendHeader("Cache-Control", "no-cache");
     server.send(200, "application/json", out);
 }
 
 static void handleConfig() {
     lastActivityMs = millis();
-
     String ssid = server.arg("ssid");
     String pass = server.arg("password");
-
     if (ssid.isEmpty()) {
-        server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"SSID is required\"}");
+        server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"SSID required\"}");
         return;
     }
-
-    // Save to NVS immediately (even before testing, so a reboot will retry)
     saveWifiCredentials(ssid, pass);
-
-    // Attempt connection
     WiFi.disconnect(false);
     WiFi.begin(ssid.c_str(), pass.c_str());
-
     int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 24) {
-        delay(500);
-        attempts++;
-    }
-
+    while (WiFi.status() != WL_CONNECTED && attempts < 24) { delay(500); attempts++; }
     JsonDocument doc;
     if (WiFi.status() == WL_CONNECTED) {
         doc["status"] = "ok";
         doc["ssid"]   = WiFi.SSID();
         doc["rssi"]   = WiFi.RSSI();
         doc["ip"]     = WiFi.localIP().toString();
-        // Update mDNS now that we have an IP
         MDNS.begin(CONFIG_MDNS_HOST);
     } else {
         doc["status"] = "failed";
-        doc["msg"]    = "Could not connect — check the password";
+        doc["msg"]    = "Could not connect - check the password";
     }
-
-    String out;
-    serializeJson(doc, out);
+    String out; serializeJson(doc, out);
     server.send(200, "application/json", out);
+}
+
+static void handleGetSettings() {
+    lastActivityMs = millis();
+    JsonDocument doc;
+    doc["web_always_on"] = isWebAlwaysOn();
+    String out; serializeJson(doc, out);
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(200, "application/json", out);
+}
+
+static void handlePostSettings() {
+    lastActivityMs = millis();
+    bool val = (server.arg("web_always_on") == "1");
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putBool(NVS_KEY_WEB_ALWAYS_ON, val);
+    prefs.end();
+    Serial.printf("[CONFIG] always-on portal: %s\r\n", val ? "ON" : "OFF");
+    server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
 static void handleRestart() {
@@ -381,79 +365,73 @@ static void handleRestart() {
     ESP.restart();
 }
 
-// Captive portal redirect — any unrecognised path goes to config page
 static void handleCaptive() {
     server.sendHeader("Location", String("http://") + WiFi.softAPIP().toString() + "/");
-    server.send(302, "text/plain", "Redirecting to DodZero Setup…");
+    server.send(302, "text/plain", "Redirecting...");
 }
 
 // ==========================================
-// Public entry point
+// Shared helpers
+// ==========================================
+
+static void startAP() {
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.softAP(CONFIG_AP_SSID, nullptr, 1, false, 4);
+    delay(200);
+    dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+    dnsServer.start(53, "*", WiFi.softAPIP());
+    Serial.printf("[AP] '%s'  IP: %s\r\n", CONFIG_AP_SSID,
+                  WiFi.softAPIP().toString().c_str());
+}
+
+static void setupWebServer() {
+    server.on("/",                           HTTP_GET,  handleRoot);
+    server.on("/api/status",                 HTTP_GET,  handleStatus);
+    server.on("/api/scan",                   HTTP_GET,  handleScan);
+    server.on("/api/config",                 HTTP_POST, handleConfig);
+    server.on("/api/settings",               HTTP_GET,  handleGetSettings);
+    server.on("/api/settings",               HTTP_POST, handlePostSettings);
+    server.on("/api/restart",                HTTP_POST, handleRestart);
+    server.on("/hotspot-detect.html",        HTTP_GET,  handleRoot);
+    server.on("/library/test/success.html",  HTTP_GET,  handleRoot);
+    server.on("/success.txt",                HTTP_GET,  handleRoot);
+    server.on("/generate_204",               HTTP_GET,  handleRoot);
+    server.on("/connectcheck.html",          HTTP_GET,  handleRoot);
+    server.on("/redirect",                   HTTP_GET,  handleCaptive);
+    server.on("/ncsi.txt",                   HTTP_GET,  handleRoot);
+    server.onNotFound(handleCaptive);
+    server.begin();
+}
+
+// ==========================================
+// enterConfigMode — triggered by dev pin
 // ==========================================
 
 void enterConfigMode() {
     Serial.println("\r\n[CONFIG] *** WiFi Configuration Mode ***");
 
-    // 6× fast blinks to signal config mode on the LED
     for (int i = 0; i < 6; i++) {
         digitalWrite(statusLedPin, ledOn);  delay(100);
         digitalWrite(statusLedPin, ledOff); delay(100);
     }
     digitalWrite(statusLedPin, ledOn);
 
-    // ---- Start AP + STA simultaneously ----
-    WiFi.mode(WIFI_AP_STA);
-    WiFi.softAP(CONFIG_AP_SSID, nullptr, 1, false, 4);
-    delay(200);
+    startAP();
 
-    IPAddress apIp = WiFi.softAPIP();
-    Serial.printf("[CONFIG] Hotspot:  SSID='%s'  IP=%s\r\n", CONFIG_AP_SSID, apIp.toString().c_str());
-
-    // ---- Try to connect to stored WiFi in the background ----
     String storedSsid, storedPass;
     if (loadWifiCredentials(storedSsid, storedPass)) {
         Serial.printf("[CONFIG] Connecting to stored WiFi: %s\r\n", storedSsid.c_str());
         WiFi.begin(storedSsid.c_str(), storedPass.c_str());
-        // Non-blocking — connection progresses while we serve the portal
     }
 
-    // ---- DNS: redirect all domains to AP IP (captive portal) ----
-    dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
-    dnsServer.start(53, "*", apIp);
+    setupWebServer();
 
-    // ---- Web server routes ----
-    server.on("/",                            HTTP_GET,  handleRoot);
-    server.on("/api/status",                  HTTP_GET,  handleStatus);
-    server.on("/api/scan",                    HTTP_GET,  handleScan);
-    server.on("/api/config",                  HTTP_POST, handleConfig);
-    server.on("/api/restart",                 HTTP_POST, handleRestart);
-
-    // iOS captive portal detection endpoints
-    server.on("/hotspot-detect.html",         HTTP_GET,  handleRoot);
-    server.on("/library/test/success.html",   HTTP_GET,  handleRoot);
-    server.on("/success.txt",                 HTTP_GET,  handleRoot);
-    // Android captive portal detection
-    server.on("/generate_204",                HTTP_GET,  handleRoot);
-    server.on("/connectcheck.html",           HTTP_GET,  handleRoot);
-    server.on("/redirect",                    HTTP_GET,  handleCaptive);
-    // Windows / other
-    server.on("/ncsi.txt",                    HTTP_GET,  handleRoot);
-
-    server.onNotFound(handleCaptive);
-    server.begin();
-
-    // ---- mDNS: http://dodzero.local ----
     if (MDNS.begin(CONFIG_MDNS_HOST)) {
         MDNS.addService("http", "tcp", 80);
-        Serial.printf("[CONFIG] mDNS:     http://%s.local\r\n", CONFIG_MDNS_HOST);
+        Serial.printf("[CONFIG] mDNS: http://%s.local\r\n", CONFIG_MDNS_HOST);
     }
 
-    Serial.println("[CONFIG] -----------------------------------------");
-    Serial.printf( "[CONFIG] Connect phone to WiFi: '%s'\r\n", CONFIG_AP_SSID);
-    Serial.println("[CONFIG] Browser opens automatically (captive portal)");
-    Serial.println("[CONFIG] Or manually navigate to: http://192.168.4.1");
-    Serial.println("[CONFIG] From home network:        http://dodzero.local");
-    Serial.println("[CONFIG] -----------------------------------------");
+    Serial.printf("[CONFIG] Connect to '%s' then open http://192.168.4.1\r\n", CONFIG_AP_SSID);
 
     lastActivityMs = millis();
     bool wifiPrinted = false;
@@ -462,26 +440,55 @@ void enterConfigMode() {
         dnsServer.processNextRequest();
         server.handleClient();
 
-        // Print local IP once WiFi connects
         if (!wifiPrinted && WiFi.status() == WL_CONNECTED) {
             wifiPrinted = true;
-            Serial.printf("[CONFIG] WiFi connected! Also at: http://%s\r\n",
+            Serial.printf("[CONFIG] Also at http://%s\r\n",
                           WiFi.localIP().toString().c_str());
         }
 
-        // Slow LED blink while waiting
         static unsigned long lastBlink = 0;
         if (millis() - lastBlink > 800) {
             lastBlink = millis();
             digitalWrite(statusLedPin, !digitalRead(statusLedPin));
         }
 
-        // Inactivity timeout → reboot into normal operation
         if (millis() - lastActivityMs > CONFIG_MODE_TIMEOUT_MS) {
-            Serial.println("[CONFIG] Inactivity timeout — rebooting into normal mode…");
+            Serial.println("[CONFIG] Timeout - rebooting...");
             ESP.restart();
         }
-
         delay(5);
     }
+}
+
+// ==========================================
+// startAlwaysOnServer — non-blocking
+// ==========================================
+
+void startAlwaysOnServer() {
+    Serial.println("[ALWAYS-ON] Starting persistent web portal...");
+
+    // AP stays running so the device is always reachable for
+    // reconfiguration even if the home WiFi SSID/password changes.
+    startAP();
+    setupWebServer();
+
+    if (MDNS.begin(CONFIG_MDNS_HOST)) {
+        MDNS.addService("http", "tcp", 80);
+    }
+
+    Serial.printf("[ALWAYS-ON] AP:  http://192.168.4.1  (connect to '%s')\r\n", CONFIG_AP_SSID);
+    Serial.printf("[ALWAYS-ON] LAN: http://%s.local\r\n", CONFIG_MDNS_HOST);
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("[ALWAYS-ON] IP:  http://%s\r\n",
+                      WiFi.localIP().toString().c_str());
+    }
+}
+
+// ==========================================
+// handleAlwaysOnClients — call every loop tick
+// ==========================================
+
+void handleAlwaysOnClients() {
+    dnsServer.processNextRequest();
+    server.handleClient();
 }

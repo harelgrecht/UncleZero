@@ -119,6 +119,48 @@ void setup() {
         }
     }
 
+    // ── Always-on mode ────────────────────────────────────────────────────────
+    // Start the AP *first* (WIFI_AP_STA mode), then connect to home WiFi as STA.
+    // This avoids a mode-switch after WiFi is already in WIFI_STA, which can
+    // silently prevent softAP from becoming visible.
+    if (isWebAlwaysOn()) {
+        startAlwaysOnServer();   // brings up AP + web server in WIFI_AP_STA mode
+
+        // Connect home WiFi as STA while AP is already running
+        String nvsSsid, nvsPass;
+        bool hasStored = loadWifiCredentials(nvsSsid, nvsPass);
+        const char* ssid = hasStored ? nvsSsid.c_str() : wifiSsid;
+        const char* pass = hasStored ? nvsPass.c_str() : wifiPassword;
+        Serial.printf("[WIFI] Connecting to: %s\r\n", ssid);
+        WiFi.begin(ssid, pass);
+
+        // Wait up to 10 s, keep web server alive during connect
+        int attempts = 0;
+        while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+            handleAlwaysOnClients();
+            delay(500);
+            attempts++;
+        }
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.printf("[WIFI] Connected! IP: %s\r\n", WiFi.localIP().toString().c_str());
+            if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) syncNtpTime();
+        } else {
+            Serial.println("[WIFI] Home WiFi unavailable - AP still reachable at 192.168.4.1");
+        }
+
+        verifyInitialTankStatus();
+        unsigned long lastReport = 0;
+        while (true) {
+            handleAlwaysOnClients();
+            if (millis() - lastReport > 30000) {
+                lastReport = millis();
+                verifyInitialTankStatus();
+            }
+            delay(5);
+        }
+    }
+
+    // ── Normal (deep-sleep) mode ───────────────────────────────────────────────
     // Try NVS credentials first, fall back to env.h defaults
     String nvsSsid, nvsPass;
     if (loadWifiCredentials(nvsSsid, nvsPass)) {
@@ -135,23 +177,9 @@ void setup() {
     } else {
         wifiSetUp();
     }
-    
+
     if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) {
         syncNtpTime();
-    }
-
-    if (isWebAlwaysOn()) {
-        startAlwaysOnServer();
-        verifyInitialTankStatus();
-        unsigned long lastReport = 0;
-        while (true) {
-            handleAlwaysOnClients();
-            if (millis() - lastReport > 30000) {
-                lastReport = millis();
-                verifyInitialTankStatus();
-            }
-            delay(5);
-        }
     }
 
     printWakeupReason();
