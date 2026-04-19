@@ -7,7 +7,8 @@
 #define NVS_NAMESPACE         "dodzero"
 #define NVS_KEY_SSID          "wifi_ssid"
 #define NVS_KEY_PASS          "wifi_pass"
-#define NVS_KEY_WEB_ALWAYS_ON "web_always_on"
+#define NVS_KEY_WEB_ALWAYS_ON   "web_always_on"
+#define NVS_KEY_RESTAURANT_NAME "restaurant_name"
 
 // AP hotspot name (open network — no password needed)
 #define CONFIG_AP_SSID    "DodZero-Setup"
@@ -39,6 +40,11 @@ void enterConfigMode();
  * Returns true when valid credentials are present.
  */
 bool loadWifiCredentials(String& ssid, String& password);
+
+/**
+ * Returns the restaurant name stored in NVS, or empty string if not set.
+ */
+String getRestaurantName();
 
 /**
  * Returns true if the "always-on web portal" setting is enabled in NVS.

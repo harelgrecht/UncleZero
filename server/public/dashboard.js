@@ -183,9 +183,10 @@ function deviceCardHtml(deviceId, deviceSensors) {
   const hasAlert = deviceSensors.some(s => s.status === 'EMPTY');
   const latestTs = Math.max(...deviceSensors.map(s => s.last_seen));
   const rssi     = deviceSensors[0]?.rssi;
+  const safeId   = deviceId.replace(/[^a-z0-9]/gi, '-');
 
   return `
-    <div class="device-card ${hasAlert ? 'has-alert' : ''}" id="device-${deviceId.replace(/[^a-z0-9]/gi, '-')}">
+    <div class="device-card ${hasAlert ? 'has-alert' : ''}" id="device-${safeId}">
       <div class="device-header">
         <div>
           <div class="device-name">
@@ -196,6 +197,18 @@ function deviceCardHtml(deviceId, deviceSensors) {
         <div class="device-meta">
           ${rssiHtml(rssi)}
           <div class="last-seen" data-ts="${latestTs}">${timeAgo(latestTs)}</div>
+          <button
+            class="delete-device-btn"
+            title="Delete device"
+            onclick="deleteDevice('${deviceId.replace(/'/g, "\\'")}')"
+            style="
+              background:none;border:1px solid var(--border);color:var(--text-secondary);
+              border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;
+              transition:color .2s,border-color .2s;margin-left:4px;
+            "
+            onmouseover="this.style.color='#c0392b';this.style.borderColor='#c0392b'"
+            onmouseout="this.style.color='var(--text-secondary)';this.style.borderColor='var(--border)'"
+          >&#x1F5D1;</button>
         </div>
       </div>
       <div class="device-sensors">
@@ -410,6 +423,25 @@ function startClock() {
   }
   tick();
   setInterval(tick, 10_000);
+}
+
+// ---------------------------------------------------------------------------
+// Device Deletion
+// ---------------------------------------------------------------------------
+
+async function deleteDevice(deviceId) {
+  const name = deviceId.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  if (!confirm(`Delete all data for "${name}"?\n\nThis removes the device card and its alert history.`)) return;
+
+  const res = await apiFetch(`/api/sensors/${encodeURIComponent(deviceId)}`, { method: 'DELETE' });
+  if (!res || !res.ok) return;
+
+  for (const sensor of (devices.get(deviceId) || [])) {
+    sensors.delete(sensor.id);
+  }
+  devices.delete(deviceId);
+  renderDeviceGrid();
+  updateStats();
 }
 
 // ---------------------------------------------------------------------------

@@ -5,9 +5,10 @@
 // Hardware Pins & States
 // ==========================================
 constexpr uint8_t statusLedPin = 8;
-constexpr uint8_t sensor1Pin = 3; 
-constexpr uint8_t sensor2Pin = 2; 
-constexpr uint8_t devModePin = 10;  // update firmware pin - drive GND to enable
+constexpr uint8_t sensor1Pin = 0;
+constexpr uint8_t sensor1Gnd = 1;
+constexpr uint8_t sensor2Pin = 3; 
+constexpr uint8_t sensor2Gnd = 4;
 
 constexpr uint8_t tankFullState = HIGH;  // Circuit open 
 constexpr uint8_t tankEmptyState = LOW;  // Circuit close 

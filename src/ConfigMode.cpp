@@ -118,6 +118,14 @@ input:checked+.sl:before{transform:translateX(22px)}
 </div>
 
 <div class="card">
+  <div class="card-title">Restaurant Name</div>
+  <label for="restaurant-name">Name shown on the dashboard</label>
+  <input type="text" id="restaurant-name" placeholder="e.g. my-restaurant" autocomplete="off" autocapitalize="none" spellcheck="false">
+  <button class="btn primary" id="name-btn" onclick="doSaveName()">Save Name</button>
+  <div id="name-result"></div>
+</div>
+
+<div class="card">
   <div class="card-title">Device Settings</div>
   <div class="toggle-row">
     <div>
@@ -231,8 +239,31 @@ function doRestart(){
     setTimeout(function(){btn.disabled=false;btn.textContent='Restart Device';},6000);
   });
 }
+function loadRestaurantName(){
+  fetch('/api/device-name').then(function(r){return r.json();}).then(function(d){
+    qi('restaurant-name').value=d.name||'';
+  }).catch(function(){});
+}
+function doSaveName(){
+  var name=qi('restaurant-name').value.trim();
+  if(!name){alert('Please enter a restaurant name.');return;}
+  var btn=qi('name-btn'),res=qi('name-result');
+  btn.disabled=true;
+  fetch('/api/device-name',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'name='+encodeURIComponent(name)})
+  .then(function(r){return r.json();}).then(function(d){
+    if(d.status==='ok'){
+      res.innerHTML='<div class="alert ok">Name saved. Takes effect after next restart.</div>';
+    }else{
+      res.innerHTML='<div class="alert err">Failed to save name.</div>';
+    }
+    setTimeout(function(){res.innerHTML='';},5000);
+  }).catch(function(){
+    res.innerHTML='<div class="alert err">Request failed.</div>';
+  }).finally(function(){btn.disabled=false;});
+}
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
-loadStatus();loadSettings();setInterval(loadStatus,5000);
+loadStatus();loadSettings();loadRestaurantName();setInterval(loadStatus,5000);
 </script>
 </body>
 </html>
@@ -256,6 +287,13 @@ static void saveWifiCredentials(const String& ssid, const String& password) {
     prefs.putString(NVS_KEY_SSID, ssid.c_str());
     prefs.putString(NVS_KEY_PASS, password.c_str());
     prefs.end();
+}
+
+String getRestaurantName() {
+    prefs.begin(NVS_NAMESPACE, false);
+    String name = prefs.getString(NVS_KEY_RESTAURANT_NAME, "");
+    prefs.end();
+    return name;
 }
 
 bool isWebAlwaysOn() {
@@ -358,6 +396,26 @@ static void handlePostSettings() {
     server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
+static void handleGetDeviceName() {
+    lastActivityMs = millis();
+    JsonDocument doc;
+    doc["name"] = getRestaurantName();
+    String out; serializeJson(doc, out);
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(200, "application/json", out);
+}
+
+static void handlePostDeviceName() {
+    lastActivityMs = millis();
+    String name = server.arg("name");
+    name.trim();
+    prefs.begin(NVS_NAMESPACE, false);
+    prefs.putString(NVS_KEY_RESTAURANT_NAME, name.c_str());
+    prefs.end();
+    Serial.printf("[CONFIG] restaurant name set: %s\r\n", name.c_str());
+    server.send(200, "application/json", "{\"status\":\"ok\"}");
+}
+
 static void handleRestart() {
     lastActivityMs = millis();
     server.send(200, "application/json", "{\"status\":\"restarting\"}");
@@ -393,6 +451,8 @@ static void setupWebServer() {
     server.on("/api/config",                 HTTP_POST, handleConfig);
     server.on("/api/settings",               HTTP_GET,  handleGetSettings);
     server.on("/api/settings",               HTTP_POST, handlePostSettings);
+    server.on("/api/device-name",            HTTP_GET,  handleGetDeviceName);
+    server.on("/api/device-name",            HTTP_POST, handlePostDeviceName);
     server.on("/api/restart",                HTTP_POST, handleRestart);
     server.on("/hotspot-detect.html",        HTTP_GET,  handleRoot);
     server.on("/library/test/success.html",  HTTP_GET,  handleRoot);
