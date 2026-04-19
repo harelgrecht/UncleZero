@@ -37,7 +37,7 @@ void wifiSetUp() {
     WiFi.disconnect(true, true);
     delay(1000); 
 
-    WiFi.mode(WIFI_STA);
+    WiFi.mode(WIFI_AP_STA);
     WiFi.setTxPower(WIFI_POWER_11dBm); // Stable mid-range power
     WiFi.begin(wifiSsid, wifiPassword);
 

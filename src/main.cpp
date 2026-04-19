@@ -7,6 +7,10 @@
 
 volatile bool isSensor1Triggered = false;
 volatile bool isSensor2Triggered = false;
+String staSSID;
+String staPass;
+unsigned long lastReport  = 0;
+unsigned long lastWifiTry;
 
 void IRAM_ATTR handleSensor1Interrupt() {
     isSensor1Triggered = true;
@@ -46,7 +50,7 @@ void reportTankStatusToServer(const String& tankName, const String& status) {
     HTTPClient http;
     http.begin(serverUrl);
     http.addHeader("Content-Type", "application/json");
-    http.addHeader("X-Api-Key", "H4v4HSc8qF-Vt7UaL6pqlF81IJOeFcmM");
+    http.addHeader("X-Api-Key", "e6RO8MeDcgZsK1CoCogQomYWiSAgoxsSrsXm8c_Ilvg");
     
     int httpCode = http.POST(payload);
     
@@ -92,114 +96,57 @@ void verifyInitialTankStatus() {
 
 void setup() {
     Serial.begin(115200);
-    delay(1000);
+    delay(3000);
     pinMode(sensor1Pin, INPUT_PULLUP);
     pinMode(sensor2Pin, INPUT_PULLUP);
     pinMode(devModePin, INPUT_PULLUP);
     pinMode(statusLedPin, OUTPUT);
     digitalWrite(statusLedPin, ledOff);
+    Serial.println("\r\n[BOOT] Starting up...");
 
-    if (digitalRead(devModePin) == LOW) {
-        // Hold LOW for > 3 s → maintenance mode (firmware update)
-        // Release within 3 s   → config mode (WiFi provisioning via USB/BLE)
-        Serial.println("\r\n[BOOT] devMode pin is LOW - waiting 3 s to detect intent...");
-        unsigned long holdStart = millis();
-        bool released = false;
-        while (millis() - holdStart < 3000) {
-            if (digitalRead(devModePin) == HIGH) { released = true; break; }
-            delay(50);
-        }
-
-        if (!released) {
-            Serial.println("[MAINTENANCE MODE] Holding LOW - staying awake for firmware upload.");
-            digitalWrite(statusLedPin, ledOn);
-            while (true) { delay(100); }
-        } else {
-            // Short press → config mode (web portal, blocks until reboot)
-            enterConfigMode();
-        }
-    }
-
-    // ── Always-on mode ────────────────────────────────────────────────────────
-    // Key insight: when STA is already connected, ESP32 forces the softAP onto
-    // the same channel automatically — so connect WiFi FIRST, then start AP.
-    // This is what worked originally and avoids all channel-conflict issues.
-    if (isWebAlwaysOn()) {
-        // 1. Connect home WiFi as STA (normal STA mode)
-        String nvsSsid, nvsPass;
-        bool hasStored = loadWifiCredentials(nvsSsid, nvsPass);
-        const char* staSSID = hasStored ? nvsSsid.c_str() : wifiSsid;
-        const char* staPass = hasStored ? nvsPass.c_str() : wifiPassword;
-        Serial.printf("[WIFI] Connecting to: %s\r\n", staSSID);
-        WiFi.mode(WIFI_STA);
-        WiFi.begin(staSSID, staPass);
-        int att = 0;
-        while (WiFi.status() != WL_CONNECTED && att < 40) { delay(500); att++; }
-        if (WiFi.status() == WL_CONNECTED) {
-            Serial.printf("[WIFI] Connected! IP: %s  ch%d\r\n",
-                          WiFi.localIP().toString().c_str(), WiFi.channel());
-            if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) syncNtpTime();
-        } else {
-            Serial.printf("[WIFI] Home WiFi unavailable (status=%d)\r\n", WiFi.status());
-        }
-
-        // 2. Start AP — ESP32 auto-matches AP channel to the connected STA channel
-        startAlwaysOnServer(1);  // channel arg is overridden by STA channel when connected
-
-        verifyInitialTankStatus();
-        unsigned long lastReport  = 0;
-        unsigned long lastWifiTry = millis();
-        while (true) {
-            handleAlwaysOnClients();
-
-            // Retry WiFi every 60 s when disconnected
-            if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTry > 60000) {
-                lastWifiTry = millis();
-                Serial.printf("[WIFI] Retrying: %s\r\n", staSSID);
-                WiFi.begin(staSSID, staPass);
-                int r = 0;
-                while (WiFi.status() != WL_CONNECTED && r < 20) {
-                    handleAlwaysOnClients(); delay(500); r++;
-                }
-                if (WiFi.status() == WL_CONNECTED)
-                    Serial.printf("[WIFI] Reconnected! IP: %s\r\n", WiFi.localIP().toString().c_str());
-            }
-
-            if (millis() - lastReport > 30000) {
-                lastReport = millis();
-                verifyInitialTankStatus();
-            }
-            delay(5);
-        }
-    }
-
-    // ── Normal (deep-sleep) mode ───────────────────────────────────────────────
-    // Try NVS credentials first, fall back to env.h defaults
+    // 1. Connect home WiFi as STA (normal STA mode)
     String nvsSsid, nvsPass;
-    if (loadWifiCredentials(nvsSsid, nvsPass)) {
-        Serial.printf("[WIFI] Using stored credentials for: %s\r\n", nvsSsid.c_str());
-        WiFi.begin(nvsSsid.c_str(), nvsPass.c_str());
-        int attempts = 0;
-        while (WiFi.status() != WL_CONNECTED && attempts < 20) { delay(500); attempts++; }
-        if (WiFi.status() != WL_CONNECTED) {
-            Serial.println("[WIFI] Stored credentials failed, falling back to env.h");
-            wifiSetUp();
-        } else {
-            Serial.printf("[WIFI] Connected! IP: %s\r\n", WiFi.localIP().toString().c_str());
-        }
+    bool hasStored = loadWifiCredentials(nvsSsid, nvsPass);
+    staSSID = hasStored ? nvsSsid.c_str() : wifiSsid;
+    staPass = hasStored ? nvsPass.c_str() : wifiPassword;
+    
+    Serial.printf("[WIFI] Connecting to: %s\r\n", staSSID);
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.setTxPower(WIFI_POWER_11dBm); // Stable mid-range power
+    WiFi.begin(staSSID, staPass);
+    int att = 0;
+    while (WiFi.status() != WL_CONNECTED && att < 40) { delay(500); att++; }
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("[WIFI] Connected! IP: %s  ch%d\r\n",
+                        WiFi.localIP().toString().c_str(), WiFi.channel());
+        if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) syncNtpTime();
     } else {
-        wifiSetUp();
+        Serial.printf("[WIFI] Home WiFi unavailable (status=%d)\r\n", WiFi.status());
     }
 
-    if (Settings::currentWakeupMode == MODE_SPECIFIC_TIME) {
-        syncNtpTime();
-    }
+    // 2. Start AP — ESP32 auto-matches AP channel to the connected STA channel
+    startAlwaysOnServer(1);  // channel arg is overridden by STA channel when connected
 
-    printWakeupReason();
-
-    goToSleep();
+    verifyInitialTankStatus();
 }
 
 void loop() {
-    // Left empty intentionally. System operates on Deep Sleep architecture.
+    handleAlwaysOnClients();
+    // Retry WiFi every 60 s when disconnected
+    if (WiFi.status() != WL_CONNECTED && millis() - lastWifiTry > 60000) {
+        lastWifiTry = millis();
+        Serial.printf("[WIFI] Retrying: %s\r\n", staSSID);
+        WiFi.begin(staSSID, staPass);
+        int r = 0;
+        while (WiFi.status() != WL_CONNECTED && r < 20) {
+            handleAlwaysOnClients(); delay(500); r++;
+        }
+        if (WiFi.status() == WL_CONNECTED)
+            Serial.printf("[WIFI] Reconnected! IP: %s\r\n", WiFi.localIP().toString().c_str());
+    }
+    if (millis() - lastReport > 30000) {
+        lastReport = millis();
+        verifyInitialTankStatus();
+    }
+    delay(5);
 }
