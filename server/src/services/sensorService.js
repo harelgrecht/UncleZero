@@ -101,7 +101,9 @@ function processReport({ deviceId, sensors, rssi, uptime }) {
       const sensorId      = `${deviceId}:sensor-${sensor.id}`;
       const previousRow   = stmts.getSensor.get(sensorId);
       const previousStatus = previousRow?.status;
-      const newStatus      = sensor.status; // "OK" or "EMPTY"
+      const rawStatus      = sensor.status;
+      // Normalise firmware variants: "FULL" (tank has gas) → "OK"
+      const newStatus      = rawStatus === 'FULL' ? 'OK' : rawStatus; // "OK" or "EMPTY"
 
       stmts.upsertSensor.run({
         id:        sensorId,
