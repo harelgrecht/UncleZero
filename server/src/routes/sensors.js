@@ -56,4 +56,14 @@ router.get('/', requireAuth, (_req, res) => {
   res.json(sensorService.getAllSensors());
 });
 
+// ---------------------------------------------------------------------------
+// DELETE /api/sensors/:deviceId  —  Protected by JWT (dashboard users)
+// ---------------------------------------------------------------------------
+router.delete('/:deviceId', requireAuth, (req, res) => {
+  const { deviceId } = req.params;
+  if (!deviceId) return res.status(400).json({ error: 'deviceId required' });
+  sensorService.deleteDevice(deviceId);
+  res.json({ ok: true });
+});
+
 module.exports = router;

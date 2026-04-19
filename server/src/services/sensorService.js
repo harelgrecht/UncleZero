@@ -70,6 +70,9 @@ const stmts = {
   pruneAlerts: db.prepare(`
     DELETE FROM alerts WHERE timestamp < ?
   `),
+
+  deleteDeviceSensors: db.prepare('DELETE FROM sensors WHERE device_id = ?'),
+  deleteDeviceAlerts:  db.prepare('DELETE FROM alerts  WHERE device_id = ?'),
 };
 
 // ---------------------------------------------------------------------------
@@ -176,4 +179,16 @@ function pruneOldAlerts() {
   return result.changes; // number of rows deleted
 }
 
-module.exports = { processReport, getAllSensors, getRecentAlerts, pruneOldAlerts, onSensorEvent };
+/**
+ * Delete all sensor rows and alert history for a device.
+ * @param {string} deviceId
+ */
+function deleteDevice(deviceId) {
+  const transaction = db.transaction(() => {
+    stmts.deleteDeviceSensors.run(deviceId);
+    stmts.deleteDeviceAlerts.run(deviceId);
+  });
+  transaction();
+}
+
+module.exports = { processReport, getAllSensors, getRecentAlerts, pruneOldAlerts, onSensorEvent, deleteDevice };
