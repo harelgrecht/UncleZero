@@ -270,10 +270,13 @@ function prependAlert(alert, animate = false) {
 
   const item = document.createElement('div');
   item.className = `alert-item ${alert.event}${animate ? ' new-alert' : ''}`;
+  const sensorNum  = alert.sensor_num  ?? alert.sensorNum;
+  const deviceId   = alert.device_id   ?? alert.deviceId;
+  const deviceName = (deviceId || '').replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   item.innerHTML = `
     <div class="alert-body">
-      <div class="alert-event">${eventLabel(alert.event)} — Sensor ${alert.sensor_num}</div>
-      <div class="alert-detail">${alert.device_id}</div>
+      <div class="alert-event">${eventLabel(alert.event)} — Sensor ${sensorNum}</div>
+      <div class="alert-detail">${deviceName}</div>
     </div>
     <div class="alert-time">${formatTime(alert.timestamp)}</div>
   `;
